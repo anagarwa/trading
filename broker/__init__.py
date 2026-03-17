@@ -1,13 +1,13 @@
 from config import ACTIVE_BROKER
-from broker.kite_broker import KiteBroker
-from broker.breeze_broker import BreezeBroker
 from broker.base_broker import BaseBroker
 
 
 def get_broker() -> BaseBroker:
     if ACTIVE_BROKER == "kite":
+        from broker.kite_broker import KiteBroker
         return KiteBroker()
     elif ACTIVE_BROKER == "breeze":
+        from broker.breeze_broker import BreezeBroker
         return BreezeBroker()
     else:
         raise ValueError(
