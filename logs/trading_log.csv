@@ -1,1 +1,2 @@
 timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capital_remaining,notes
+2026-03-18T01:12:37.606230+05:30,morning,kite,INFO,,,,,,,,=== Morning session started ===

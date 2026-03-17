@@ -1,8 +1,8 @@
 {
-  "capital_remaining": 10000.00,
-  "profit_booked": 0.00,
-  "total_losses_taken": 0.00,
+  "capital_remaining": 10000.0,
+  "profit_booked": 0.0,
+  "total_losses_taken": 0.0,
   "holdings": [],
-  "last_updated": "2026-03-15T00:00:00+05:30",
+  "last_updated": "2026-03-18T01:12:37.905992+05:30",
   "trading_day_complete": false
 }
