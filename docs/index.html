@@ -63,18 +63,18 @@
   // ─────────────────────────────────────────────────────────────────────────
 
   // Your GitHub username and the exact repo name
-  const OWNER = "YOUR_GITHUB_USERNAME";   // ← replace
-  const REPO  = "trading-agent";          // ← replace
+  const OWNER = "anagarwa";   // ← replace
+  const REPO  = "trading";          // ← replace
 
   // Fine-grained PAT with ONLY "Actions: Write" scope for this repo.
   // Even if this value is seen by others, the worst they can do is trigger
   // token_exchange.yml with a fake token — which fails harmlessly at the Kite API.
   // Rotate this every 90 days (GitHub will email you before expiry).
-  const FINE_GRAINED_PAT = "github_pat_REPLACE_WITH_YOUR_FINE_GRAINED_PAT";  // ← replace
+  const FINE_GRAINED_PAT = "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";  // ← replace
 
   // Must exactly match the WEBHOOK_SECRET GitHub Actions secret in your repo.
   // Acts as a second security gate inside the workflow.
-  const WEBHOOK_SECRET = "REPLACE_WITH_YOUR_WEBHOOK_SECRET";  // ← replace
+  const WEBHOOK_SECRET = "c7f9c8b4e2d94f1fa6c3a1e7b0d5f8c2a4e6d9b1c3f7e5a8d2c6b9f1a4e8c7d5";  // ← replace
 
   // ─────────────────────────────────────────────────────────────────────────
   // Logic — do not edit below this line
