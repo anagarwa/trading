@@ -1,0 +1,22 @@
+# Cloudflare Worker configuration for wrangler CLI
+# This file is optional — you can also deploy via copy-paste in the Cloudflare Dashboard.
+#
+# To deploy with wrangler:
+#   npm install -g wrangler
+#   wrangler login
+#   wrangler deploy
+#
+# To set secrets (one-time, encrypted):
+#   wrangler secret put FINE_GRAINED_PAT        # GitHub PAT with Actions: Read & Write
+#   wrangler secret put GITHUB_OWNER            # Your GitHub username
+#   wrangler secret put GITHUB_REPO             # Your repo name
+#
+# To tail live logs (great for debugging):
+#   wrangler tail
+
+name = "kite-token-exchange"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Workers are deployed to: https://kite-token-exchange.<your-subdomain>.workers.dev/
+# Set this URL as the redirect URL in your Kite Developer Console app.

@@ -1,21 +1,21 @@
 name: Kite Token Exchange
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Triggered by the GitHub Pages redirect page (docs/index.html) immediately
-# after the user completes Zerodha's OAuth login.
+# Triggered by the Cloudflare Worker (cloudflare/worker.js) immediately after
+# the user completes Zerodha's OAuth login.
+#
+# The Cloudflare Worker holds FINE_GRAINED_PAT as a server-side secret, so
+# only the Worker can trigger this workflow. No client-side secrets needed.
 #
 # Inputs:
 #   request_token  — The short-lived token Zerodha sends to the redirect URL.
 #                    Valid for 5 minutes only.
-#   webhook_secret — Must match the WEBHOOK_SECRET GitHub Secret.
-#                    Acts as a second authorization gate.
 #
 # What this workflow does:
-#   1. Validates webhook_secret to reject unauthorized triggers.
-#   2. Computes SHA256(api_key + request_token + api_secret).
-#   3. POSTs to Kite's /session/token endpoint to exchange for access_token.
-#   4. Updates the KITE_ACCESS_TOKEN GitHub Secret (valid until 6 AM next day).
-#   5. Updates the KITE_TOKEN_DATE GitHub Secret (YYYY-MM-DD in IST).
+#   1. Computes SHA256(api_key + request_token + api_secret).
+#   2. POSTs to Kite's /session/token endpoint to exchange for access_token.
+#   3. Updates the KITE_ACCESS_TOKEN GitHub Secret (valid until 6 AM next day).
+#   4. Updates the KITE_TOKEN_DATE GitHub Secret (YYYY-MM-DD in IST).
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -24,9 +24,6 @@ on:
       request_token:
         description: 'Kite request_token from redirect URL'
         required: true
-      webhook_secret:
-        description: 'Webhook secret (must match WEBHOOK_SECRET secret)'
-        required: true
 
 jobs:
   exchange_token:
@@ -34,16 +31,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      # ── Step 1: Validate webhook secret ─────────────────────────────────
-      - name: Validate webhook secret
-        run: |
-          if [ "${{ github.event.inputs.webhook_secret }}" != "${{ secrets.WEBHOOK_SECRET }}" ]; then
-            echo "::error::Unauthorized: webhook_secret does not match. Aborting."
-            exit 1
-          fi
-          echo "Webhook secret validated."
-
-      # ── Step 2: Exchange request_token → access_token (via Kite API) ────
+      # ── Step 1: Exchange request_token → access_token (via Kite API) ─────
       - name: Exchange request_token for access_token
         id: exchange
         env:
@@ -104,7 +92,7 @@ jobs:
           print("access_token obtained successfully. Proceeding to update secrets...")
           PYEOF
 
-      # ── Step 3: Update GitHub Secrets ────────────────────────────────────
+      # ── Step 2: Update GitHub Secrets ────────────────────────────────────
       # GH_PAT must have: Secrets: Read & Write  +  Contents: Read & Write
       - name: Update KITE_ACCESS_TOKEN and KITE_TOKEN_DATE secrets
         env:

@@ -36,8 +36,7 @@
       margin: 20px auto 0;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .success { color: #3fb950; }
-    .error   { color: #f85149; }
+    .error { color: #f85149; }
     code {
       background: #0d1117;
       border: 1px solid #30363d;
@@ -52,29 +51,20 @@
 <body>
 <div class="card" id="card">
   <div class="icon">⏳</div>
-  <h1>Authorising trading bot…</h1>
-  <p>Securely handing off your Kite token to GitHub Actions.</p>
+  <h1>Redirecting to token exchange…</h1>
+  <p>Forwarding your Kite token to the Cloudflare Worker.</p>
   <div class="spinner"></div>
 </div>
 
 <script>
   // ─────────────────────────────────────────────────────────────────────────
-  // CONFIGURATION — fill these in once, then commit docs/index.html
+  // CONFIGURATION — set your Cloudflare Worker URL here (not a secret)
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Your GitHub username and the exact repo name
-  const OWNER = "anagarwa";   // ← replace
-  const REPO  = "trading";          // ← replace
-
-  // Fine-grained PAT with ONLY "Actions: Write" scope for this repo.
-  // Even if this value is seen by others, the worst they can do is trigger
-  // token_exchange.yml with a fake token — which fails harmlessly at the Kite API.
-  // Rotate this every 90 days (GitHub will email you before expiry).
-  const FINE_GRAINED_PAT = "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";  // ← replace
-
-  // Must exactly match the WEBHOOK_SECRET GitHub Actions secret in your repo.
-  // Acts as a second security gate inside the workflow.
-  const WEBHOOK_SECRET = "c7f9c8b4e2d94f1fa6c3a1e7b0d5f8c2a4e6d9b1c3f7e5a8d2c6b9f1a4e8c7d5";  // ← replace
+  // Replace with your deployed Cloudflare Worker URL.
+  // Example: "https://kite-token-exchange.YOUR-SUBDOMAIN.workers.dev"
+  // No trailing slash.
+  const WORKER_URL = "https://kite-token-exchange.YOUR-SUBDOMAIN.workers.dev";  // ← replace
 
   // ─────────────────────────────────────────────────────────────────────────
   // Logic — do not edit below this line
@@ -83,15 +73,7 @@
   const params       = new URLSearchParams(window.location.search);
   const requestToken = params.get("request_token");
 
-  function showSuccess() {
-    document.getElementById("card").innerHTML = `
-      <div class="icon">✅</div>
-      <h1 class="success">Bot is active for today!</h1>
-      <p>Your Kite access token has been securely sent to GitHub Actions.</p>
-      <p style="margin-top:12px">The token exchange workflow is running now and will update the secret within ~30 seconds.</p>
-      <p style="margin-top:16px;font-size:13px">You can safely close this tab.</p>
-    `;
-  }
+  console.log("[index.html] Page loaded. request_token present:", !!requestToken);
 
   function showError(msg) {
     document.getElementById("card").innerHTML = `
@@ -99,48 +81,21 @@
       <h1 class="error">Token exchange failed</h1>
       <p style="margin-top:8px">${msg}</p>
       <p style="margin-top:16px;font-size:13px">
-        Check that <code>FINE_GRAINED_PAT</code> and <code>WEBHOOK_SECRET</code>
-        are correctly set in <code>docs/index.html</code>.
+        Check that <code>WORKER_URL</code> is correctly set in <code>docs/index.html</code>
+        and that your Cloudflare Worker is deployed.
       </p>
     `;
   }
 
-  // Trigger automatically on page load if request_token is present
   if (!requestToken) {
+    console.error("[index.html] No request_token in URL — Kite login may have failed.");
     showError("No <code>request_token</code> found in the URL. The Kite login may have failed.");
   } else {
-    // Fire workflow_dispatch to token_exchange.yml
-    fetch(
-      `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/token_exchange.yml/dispatches`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${FINE_GRAINED_PAT}`,
-          "Accept":        "application/vnd.github.v3+json",
-          "Content-Type":  "application/json",
-        },
-        body: JSON.stringify({
-          ref: "main",
-          inputs: {
-            request_token: requestToken,
-            webhook_secret: WEBHOOK_SECRET,
-          },
-        }),
-      }
-    )
-    .then(response => {
-      if (response.status === 204) {
-        // 204 No Content = GitHub accepted the dispatch
-        showSuccess();
-      } else {
-        return response.text().then(text => {
-          showError(`GitHub API returned HTTP ${response.status}.<br><code>${text.slice(0, 200)}</code>`);
-        });
-      }
-    })
-    .catch(err => {
-      showError("Network error: <code>" + err.message + "</code>");
-    });
+    // Forward all query params (including request_token) to the Cloudflare Worker.
+    // The Worker holds all secrets server-side — nothing sensitive is in this file.
+    const workerTarget = WORKER_URL + window.location.search;
+    console.log("[index.html] Redirecting to Cloudflare Worker:", workerTarget.replace(requestToken, "[REDACTED]"));
+    window.location.replace(workerTarget);
   }
 </script>
 </body>

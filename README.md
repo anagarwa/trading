@@ -67,7 +67,11 @@ trading/
 │   └── trading_log.csv           # Append-only trade audit trail
 │
 ├── docs/
-│   └── index.html                # GitHub Pages redirect page for Kite token exchange
+│   └── index.html                # GitHub Pages redirect shim (forwards to Cloudflare Worker)
+│
+├── cloudflare/
+│   ├── worker.js                 # Cloudflare Worker — Kite OAuth handler (copy-paste to deploy)
+│   └── wrangler.toml             # Optional wrangler CLI config
 │
 ├── scripts/
 │   └── check_market_open.py      # Skips run on NSE holidays/weekends
@@ -115,7 +119,7 @@ Copy `.env.example` to `.env` and fill in every value before running.
 | `DRY_RUN` | `false` | Set to `true` to simulate trades without placing real orders |
 | `TELEGRAM_BOT_TOKEN` | _(empty)_ | Your Telegram bot token (from @BotFather) |
 | `TELEGRAM_CHAT_ID` | _(empty)_ | Your Telegram chat or channel ID |
-| `WEBHOOK_SECRET` | _(required for token automation)_ | Random secret string; must match value hardcoded in `docs/index.html` |
+| `CLOUDFLARE_WORKER_URL` | _(required for token automation)_ | Public URL of your deployed Cloudflare Worker — set only in `docs/index.html` (not a secret) |
 
 ### Risk Threshold Overrides (all optional)
 
@@ -386,7 +390,7 @@ Confirm all of the following secrets are set in **GitHub → Settings → Secret
 | `KITE_API_SECRET` | If using Kite | |
 | `KITE_ACCESS_TOKEN` | If using Kite | Auto-updated by `token_exchange.yml` |
 | `KITE_TOKEN_DATE` | If using Kite | Auto-updated by `token_exchange.yml` |
-| `WEBHOOK_SECRET` | If using Kite | Random string; also hardcoded in `docs/index.html` |
+| `CLOUDFLARE_WORKER_URL` | If using Kite | Set as `WORKER_URL` in `docs/index.html` only — **not** a GitHub Secret |
 | `BREEZE_API_KEY` | If using Breeze | |
 | `BREEZE_API_SECRET` | If using Breeze | |
 | `BREEZE_SESSION_TOKEN` | If using Breeze | Refresh manually each morning |
@@ -448,18 +452,21 @@ You (each morning before 9:30 AM)
           │  (Zerodha login + 2-FA)
           │
           ▼
-      Zerodha redirects to GitHub Pages:
-      https://YOUR_USERNAME.github.io/trading-agent/?request_token=XXXX
+      Zerodha redirects to your redirect URL:
+      https://kite-token-exchange.YOUR-SUBDOMAIN.workers.dev/?request_token=XXXX
+          │  (or via GitHub Pages shim: docs/index.html → Worker URL)
           │
-          │  docs/index.html reads request_token from URL
-          │  fires POST to GitHub API → triggers token_exchange.yml
+          ▼
+      Cloudflare Worker (cloudflare/worker.js)
+          │  Reads FINE_GRAINED_PAT from Worker secrets (server-side, never exposed)
+          │  fires POST to GitHub Actions API → triggers token_exchange.yml
+          │  Returns success/error HTML page to browser
           ▼
       GitHub Actions: token_exchange.yml
-          │  1. Validates webhook_secret
-          │  2. SHA256(api_key + request_token + api_secret)
-          │  3. POST → https://api.kite.trade/session/token
-          │  4. Updates KITE_ACCESS_TOKEN secret
-          │  5. Updates KITE_TOKEN_DATE secret (YYYY-MM-DD IST)
+          │  1. SHA256(api_key + request_token + api_secret)
+          │  2. POST → https://api.kite.trade/session/token
+          │  3. Updates KITE_ACCESS_TOKEN secret
+          │  4. Updates KITE_TOKEN_DATE secret (YYYY-MM-DD IST)
           ▼
       9:35 AM: trading.yml fires
           │  main.py checks KITE_TOKEN_DATE == today → ✅
@@ -474,53 +481,82 @@ You (each morning before 9:30 AM)
 
 | Item | Where to store | Why |
 |---|---|---|
-| `FINE_GRAINED_PAT` | Hardcoded in `docs/index.html` | Needed by browser JS to call GitHub `workflow_dispatch` API |
-| `WEBHOOK_SECRET` | Both places: hardcoded in `docs/index.html` **and** GitHub Repository Secret `WEBHOOK_SECRET` | Request is accepted only if both values match |
+| `FINE_GRAINED_PAT` | **Cloudflare Worker secret** (`FINE_GRAINED_PAT`) | Server-side only — never in HTML or client-side code |
+| `GITHUB_OWNER` | **Cloudflare Worker secret** (`GITHUB_OWNER`) | Your GitHub username; stored in the Worker |
+| `GITHUB_REPO` | **Cloudflare Worker secret** (`GITHUB_REPO`) | Your repo name; stored in the Worker |
+| `CLOUDFLARE_WORKER_URL` | `docs/index.html` constant `WORKER_URL` | **Not a secret** — it is a public URL |
 | `GH_PAT` | GitHub Repository Secret `GH_PAT` | Used server-side in workflows to push files and update secrets |
 | `KITE_API_KEY` | GitHub Repository Secret `KITE_API_KEY` | Used in token exchange workflow |
 | `KITE_API_SECRET` | GitHub Repository Secret `KITE_API_SECRET` | Used in token exchange workflow |
 | `KITE_ACCESS_TOKEN` | GitHub Repository Secret `KITE_ACCESS_TOKEN` (auto-updated) | Consumed by trading workflow |
 | `KITE_TOKEN_DATE` | GitHub Repository Secret `KITE_TOKEN_DATE` (auto-updated) | Freshness guard in `main.py` |
 
-> `FINE_GRAINED_PAT` is intentionally client-side in this GitHub Pages design. Keep its scope minimal and rotate frequently.
+> **No secrets live in HTML or client-side code anymore.** `docs/index.html` only contains the public Cloudflare Worker URL and immediately redirects to it.
 
-#### 1. Enable GitHub Pages
+#### 1. Deploy the Cloudflare Worker
 
-- Push the repo to GitHub.
-- Go to **Settings → Pages**.
-- Source: **Deploy from a branch**, Branch: `main`, Folder: `/docs`.
-- Your redirect page is now live at `https://YOUR_USERNAME.github.io/REPO_NAME/`.
+The `cloudflare/` folder contains the Worker code (`worker.js`) and an optional wrangler config (`wrangler.toml`).
 
-#### 2. Configure `docs/index.html`
+**Option A — Cloudflare Dashboard (copy-paste, no CLI needed):**
+1. Log in to [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create**.
+2. Choose **Create Worker**, paste the entire contents of `cloudflare/worker.js`, and click **Deploy**.
+3. Note the Worker URL: `https://kite-token-exchange.<your-subdomain>.workers.dev`.
 
-Open `docs/index.html` and fill in the four constants at the top of the `<script>` block:
-
-```javascript
-const OWNER            = "your-github-username";      // ← GitHub username
-const REPO             = "trading-agent";              // ← repo name
-const FINE_GRAINED_PAT = "github_pat_...";             // ← see step 3
-const WEBHOOK_SECRET   = "your-random-secret";         // ← must match GitHub secret
+**Option B — wrangler CLI:**
+```bash
+npm install -g wrangler
+wrangler login
+cd cloudflare
+wrangler deploy
 ```
 
-#### 3. Create the Fine-Grained PAT (for the HTML page)
+#### 2. Add secrets to the Cloudflare Worker
+
+In Cloudflare Dashboard → Workers → your worker → **Settings → Variables**, add three **encrypted** variables:
+
+| Variable | Value |
+|---|---|
+| `FINE_GRAINED_PAT` | A GitHub fine-grained PAT — see step 3 below |
+| `GITHUB_OWNER` | Your GitHub username (e.g. `anagarwa`) |
+| `GITHUB_REPO` | Your repo name (e.g. `trading`) |
+
+Or via wrangler CLI:
+```bash
+wrangler secret put FINE_GRAINED_PAT
+wrangler secret put GITHUB_OWNER
+wrangler secret put GITHUB_REPO
+```
+
+#### 3. Create the Fine-Grained PAT (for the Cloudflare Worker)
 
 - GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
 - **Repository access:** this repo only.
 - **Permissions (minimum):**
   - `Actions: Read and write`
-  - `Metadata: Read` (granted by default on fine-grained PATs)
+  - `Metadata: Read` (granted by default)
 - Do **not** grant `Contents`, `Secrets`, `Administration`, or org-level scopes.
-- Set expiry to **90 days** (you'll get an email reminder to rotate it).
-- Copy the token into `docs/index.html` as `FINE_GRAINED_PAT`.
+- Set expiry to **90 days** (GitHub emails you before expiry).
+- Store the token as `FINE_GRAINED_PAT` in the Cloudflare Worker secrets (step 2 above).
 
-> This PAT is embedded in a public HTML page. The limited scope (Actions:Write only) means the worst an attacker can do is trigger `token_exchange.yml` with a fake token — which fails harmlessly at the Kite API.
+> The PAT now lives **server-side in Cloudflare** — never in HTML or any client-side code.
 
-#### 4. Add GitHub Secrets
+#### 4. Configure `docs/index.html`
+
+Open `docs/index.html` and fill in the single constant:
+
+```javascript
+const WORKER_URL = "https://kite-token-exchange.YOUR-SUBDOMAIN.workers.dev";  // ← your Worker URL
+```
+
+This is the **only value** you need to set in the HTML file. It is a public URL, not a secret.
+
+The page simply reads `request_token` from the URL and immediately redirects the browser to the Cloudflare Worker, which handles all the sensitive API calls server-side.
+
+#### 5. Add GitHub Secrets
 
 | Secret | Value |
 |---|---|
-| `GH_PAT` | A **separate** fine-grained PAT (not the same as `FINE_GRAINED_PAT`) |
-| `WEBHOOK_SECRET` | The same random string you put in `docs/index.html` |
+| `GH_PAT` | A **separate** fine-grained PAT (not the same one stored in Cloudflare) |
 | `KITE_API_KEY` | From Kite Developer Console |
 | `KITE_API_SECRET` | From Kite Developer Console |
 
@@ -533,15 +569,23 @@ For `GH_PAT`, set these repository permissions:
 | `Metadata` | `Read` | Required baseline permission |
 
 Optional bootstrap note:
-- `KITE_ACCESS_TOKEN` and `KITE_TOKEN_DATE` can be created automatically by `token_exchange.yml` on first successful run.
-- If you prefer, you can also create them manually once in GitHub Secrets.
+- `KITE_ACCESS_TOKEN` and `KITE_TOKEN_DATE` are created automatically by `token_exchange.yml` on first successful run.
 
-#### 5. Set Redirect URL in Kite Developer Console
+#### 6. Set Redirect URL in Kite Developer Console
 
-Set the **redirect URL** to:
+**Preferred:** Set the redirect URL directly to your Cloudflare Worker:
 ```
-https://YOUR_USERNAME.github.io/REPO_NAME/
+https://kite-token-exchange.YOUR-SUBDOMAIN.workers.dev/
 ```
+
+**Alternative (if you already use GitHub Pages):** Keep the redirect URL as `https://YOUR_USERNAME.github.io/REPO_NAME/`. The updated `docs/index.html` will redirect → your Cloudflare Worker automatically.
+
+#### 7. Enable GitHub Pages (optional, only if using GitHub Pages as redirect fallback)
+
+- Push the repo to GitHub.
+- Go to **Settings → Pages**.
+- Source: **Deploy from a branch**, Branch: `main`, Folder: `/docs`.
+- Your redirect shim is now live at `https://YOUR_USERNAME.github.io/REPO_NAME/`.
 
 ### Token Staleness Guard
 
@@ -551,23 +595,28 @@ https://YOUR_USERNAME.github.io/REPO_NAME/
 
 This prevents silent failures where an expired token causes cryptic API errors during a live trading session.
 
-### Future Improvement — Cloudflare Worker
+### Cloudflare Worker Architecture
 
-The current architecture embeds a fine-grained PAT inside a public HTML file. While the scope is intentionally minimal, a more secure and elegant solution is to replace `docs/index.html` with a **Cloudflare Worker**:
+All secrets (`FINE_GRAINED_PAT`, `GITHUB_OWNER`, `GITHUB_REPO`) live as encrypted secrets inside the Cloudflare Worker — never in any HTML or client-side code. The flow:
 
-- The Worker runs server-side (no secrets in client-side JavaScript).
-- It receives the Kite redirect, validates the `request_token`, and calls the GitHub API to trigger `token_exchange.yml` — all without exposing any credentials.
-- Cloudflare Workers have a generous free tier (100,000 requests/day).
-- This would also allow adding rate-limiting and replay-attack protection.
+- Browser hits the GitHub Pages page (or the Worker URL directly).
+- `docs/index.html` forwards the `request_token` to the Cloudflare Worker URL.
+- The Worker reads its secrets, calls GitHub Actions API, and returns a success/error HTML page.
+- No credentials are visible in browser DevTools, page source, or the git repository.
 
-This migration is planned for a future release. The current GitHub Pages approach works well for a personal bot where the risk of token misuse is low.
+Cloudflare Workers free tier supports **100,000 requests per day** — more than sufficient for one request per morning.
+
+**Debugging Worker issues:** All `console.log` / `console.error` calls in `cloudflare/worker.js` appear in:
+- Cloudflare Dashboard → Workers → your worker → **Logs** (real-time stream)
+- `wrangler tail` (terminal, if using CLI)
 
 ### Security Checklist for PATs
 
 - Use **two different PATs**:
-  - `FINE_GRAINED_PAT` in `docs/index.html` (Actions only).
-  - `GH_PAT` in GitHub Secrets (Contents + Secrets write).
+  - `FINE_GRAINED_PAT` stored in Cloudflare Worker secrets (Actions only, server-side).
+  - `GH_PAT` in GitHub Repository Secrets (Contents + Secrets write).
 - Never reuse your personal all-repo PAT.
+- Never put any PAT token in `docs/index.html` or any HTML/JavaScript file.
 - Rotate both PATs every 60-90 days.
 - If leaked, revoke immediately in GitHub Developer Settings.
 
@@ -580,7 +629,7 @@ Two workflows run in this repo:
 | Workflow | File | Trigger |
 |---|---|---|
 | **Trading Agent** | `trading.yml` | Cron: 3× per trading day + manual dispatch |
-| **Kite Token Exchange** | `token_exchange.yml` | `workflow_dispatch` (fired by `docs/index.html`) |
+| **Kite Token Exchange** | `token_exchange.yml` | `workflow_dispatch` (fired by the Cloudflare Worker) |
 
 To enable:
 
