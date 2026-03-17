@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Bot — Kite Token Exchange</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 40px 48px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon { font-size: 56px; margin-bottom: 16px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 10px; color: #f0f6fc; }
+    p  { font-size: 15px; line-height: 1.6; color: #8b949e; margin-bottom: 8px; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 20px auto 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .success { color: #3fb950; }
+    .error   { color: #f85149; }
+    code {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 13px;
+      color: #79c0ff;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="icon">⏳</div>
+  <h1>Authorising trading bot…</h1>
+  <p>Securely handing off your Kite token to GitHub Actions.</p>
+  <div class="spinner"></div>
+</div>
+
+<script>
+  // ─────────────────────────────────────────────────────────────────────────
+  // CONFIGURATION — fill these in once, then commit docs/index.html
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Your GitHub username and the exact repo name
+  const OWNER = "YOUR_GITHUB_USERNAME";   // ← replace
+  const REPO  = "trading-agent";          // ← replace
+
+  // Fine-grained PAT with ONLY "Actions: Write" scope for this repo.
+  // Even if this value is seen by others, the worst they can do is trigger
+  // token_exchange.yml with a fake token — which fails harmlessly at the Kite API.
+  // Rotate this every 90 days (GitHub will email you before expiry).
+  const FINE_GRAINED_PAT = "github_pat_REPLACE_WITH_YOUR_FINE_GRAINED_PAT";  // ← replace
+
+  // Must exactly match the WEBHOOK_SECRET GitHub Actions secret in your repo.
+  // Acts as a second security gate inside the workflow.
+  const WEBHOOK_SECRET = "REPLACE_WITH_YOUR_WEBHOOK_SECRET";  // ← replace
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Logic — do not edit below this line
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const params       = new URLSearchParams(window.location.search);
+  const requestToken = params.get("request_token");
+
+  function showSuccess() {
+    document.getElementById("card").innerHTML = `
+      <div class="icon">✅</div>
+      <h1 class="success">Bot is active for today!</h1>
+      <p>Your Kite access token has been securely sent to GitHub Actions.</p>
+      <p style="margin-top:12px">The token exchange workflow is running now and will update the secret within ~30 seconds.</p>
+      <p style="margin-top:16px;font-size:13px">You can safely close this tab.</p>
+    `;
+  }
+
+  function showError(msg) {
+    document.getElementById("card").innerHTML = `
+      <div class="icon">🚨</div>
+      <h1 class="error">Token exchange failed</h1>
+      <p style="margin-top:8px">${msg}</p>
+      <p style="margin-top:16px;font-size:13px">
+        Check that <code>FINE_GRAINED_PAT</code> and <code>WEBHOOK_SECRET</code>
+        are correctly set in <code>docs/index.html</code>.
+      </p>
+    `;
+  }
+
+  // Trigger automatically on page load if request_token is present
+  if (!requestToken) {
+    showError("No <code>request_token</code> found in the URL. The Kite login may have failed.");
+  } else {
+    // Fire workflow_dispatch to token_exchange.yml
+    fetch(
+      `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/token_exchange.yml/dispatches`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${FINE_GRAINED_PAT}`,
+          "Accept":        "application/vnd.github.v3+json",
+          "Content-Type":  "application/json",
+        },
+        body: JSON.stringify({
+          ref: "main",
+          inputs: {
+            request_token: requestToken,
+            webhook_secret: WEBHOOK_SECRET,
+          },
+        }),
+      }
+    )
+    .then(response => {
+      if (response.status === 204) {
+        // 204 No Content = GitHub accepted the dispatch
+        showSuccess();
+      } else {
+        return response.text().then(text => {
+          showError(`GitHub API returned HTTP ${response.status}.<br><code>${text.slice(0, 200)}</code>`);
+        });
+      }
+    })
+    .catch(err => {
+      showError("Network error: <code>" + err.message + "</code>");
+    });
+  }
+</script>
+</body>
+</html>

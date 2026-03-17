@@ -1,0 +1,131 @@
+name: Kite Token Exchange
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggered by the GitHub Pages redirect page (docs/index.html) immediately
+# after the user completes Zerodha's OAuth login.
+#
+# Inputs:
+#   request_token  — The short-lived token Zerodha sends to the redirect URL.
+#                    Valid for 5 minutes only.
+#   webhook_secret — Must match the WEBHOOK_SECRET GitHub Secret.
+#                    Acts as a second authorization gate.
+#
+# What this workflow does:
+#   1. Validates webhook_secret to reject unauthorized triggers.
+#   2. Computes SHA256(api_key + request_token + api_secret).
+#   3. POSTs to Kite's /session/token endpoint to exchange for access_token.
+#   4. Updates the KITE_ACCESS_TOKEN GitHub Secret (valid until 6 AM next day).
+#   5. Updates the KITE_TOKEN_DATE GitHub Secret (YYYY-MM-DD in IST).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_token:
+        description: 'Kite request_token from redirect URL'
+        required: true
+      webhook_secret:
+        description: 'Webhook secret (must match WEBHOOK_SECRET secret)'
+        required: true
+
+jobs:
+  exchange_token:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      # ── Step 1: Validate webhook secret ─────────────────────────────────
+      - name: Validate webhook secret
+        run: |
+          if [ "${{ github.event.inputs.webhook_secret }}" != "${{ secrets.WEBHOOK_SECRET }}" ]; then
+            echo "::error::Unauthorized: webhook_secret does not match. Aborting."
+            exit 1
+          fi
+          echo "Webhook secret validated."
+
+      # ── Step 2: Exchange request_token → access_token (via Kite API) ────
+      - name: Exchange request_token for access_token
+        id: exchange
+        env:
+          KITE_API_KEY:    ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          REQUEST_TOKEN:   ${{ github.event.inputs.request_token }}
+        run: |
+          python3 << 'PYEOF'
+          import hashlib
+          import json
+          import os
+          import sys
+          import urllib.request
+          import urllib.parse
+
+          api_key       = os.environ["KITE_API_KEY"]
+          api_secret    = os.environ["KITE_API_SECRET"]
+          request_token = os.environ["REQUEST_TOKEN"]
+
+          # Kite-specified checksum: SHA256(api_key + request_token + api_secret)
+          raw = api_key + request_token + api_secret
+          checksum = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+          payload = urllib.parse.urlencode({
+              "api_key":       api_key,
+              "request_token": request_token,
+              "checksum":      checksum,
+          }).encode("utf-8")
+
+          req = urllib.request.Request(
+              "https://api.kite.trade/session/token",
+              data=payload,
+              headers={
+                  "X-Kite-Version": "3",
+                  "Content-Type":   "application/x-www-form-urlencoded",
+              },
+              method="POST",
+          )
+
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  body = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              error_body = e.read().decode("utf-8", errors="replace")
+              print(f"::error::Kite API error {e.code}: {error_body}", file=sys.stderr)
+              sys.exit(1)
+
+          if body.get("status") != "success":
+              print(f"::error::Kite returned non-success: {body.get('message', body)}", file=sys.stderr)
+              sys.exit(1)
+
+          access_token = body["data"]["access_token"]
+
+          # Write token to a temp file — never print to stdout (would appear in logs)
+          with open("/tmp/kite_token.txt", "w") as f:
+              f.write(access_token)
+
+          print("access_token obtained successfully. Proceeding to update secrets...")
+          PYEOF
+
+      # ── Step 3: Update GitHub Secrets ────────────────────────────────────
+      # GH_PAT must have: Secrets: Read & Write  +  Contents: Read & Write
+      - name: Update KITE_ACCESS_TOKEN and KITE_TOKEN_DATE secrets
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ACCESS_TOKEN=$(cat /tmp/kite_token.txt)
+
+          # Update token secret
+          gh secret set KITE_ACCESS_TOKEN \
+            --body "$ACCESS_TOKEN" \
+            --repo "${{ github.repository }}"
+
+          # Update date secret (IST = UTC+5:30)
+          TODAY_IST=$(TZ="Asia/Kolkata" date +%Y-%m-%d)
+          gh secret set KITE_TOKEN_DATE \
+            --body "$TODAY_IST" \
+            --repo "${{ github.repository }}"
+
+          # Securely wipe temp file
+          rm -f /tmp/kite_token.txt
+
+          echo "KITE_ACCESS_TOKEN updated."
+          echo "KITE_TOKEN_DATE set to $TODAY_IST (IST)."
+          echo "Token exchange complete. Trading bot is ready for today."

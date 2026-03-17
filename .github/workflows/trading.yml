@@ -1,0 +1,97 @@
+name: Trading Agent
+
+on:
+  schedule:
+    - cron: '5 4 * * 1-5'    # 9:35 AM IST  (UTC+5:30 → 04:05 UTC) Mon–Fri
+    - cron: '35 6 * * 1-5'   # 12:05 PM IST (06:35 UTC)             Mon–Fri
+    - cron: '30 9 * * 1-5'   # 3:00 PM IST  (09:30 UTC)             Mon–Fri
+  workflow_dispatch:
+    inputs:
+      run_type:
+        description: 'Run type: morning | midday | eod'
+        required: true
+        default: 'morning'
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------------ #
+      # 1. Checkout (with a PAT so the bot can push state back)             #
+      # ------------------------------------------------------------------ #
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      # ------------------------------------------------------------------ #
+      # 2. Python setup                                                      #
+      # ------------------------------------------------------------------ #
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ------------------------------------------------------------------ #
+      # 3. Determine run type from either manual input or schedule time     #
+      # ------------------------------------------------------------------ #
+      - name: Determine run type
+        id: run_type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.run_type }}" >> "$GITHUB_OUTPUT"
+          else
+            HOUR=$(TZ="Asia/Kolkata" date +%H)
+            if   [ "$HOUR" = "09" ]; then echo "type=morning" >> "$GITHUB_OUTPUT"
+            elif [ "$HOUR" = "12" ]; then echo "type=midday"  >> "$GITHUB_OUTPUT"
+            else                          echo "type=eod"     >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      # ------------------------------------------------------------------ #
+      # 4. Market holiday gate — skip if NSE is closed                      #
+      # ------------------------------------------------------------------ #
+      - name: Check if market is open
+        run: python scripts/check_market_open.py
+        # Exit 0 → open, exit 1 → closed (subsequent steps skipped)
+        continue-on-error: false
+
+      # ------------------------------------------------------------------ #
+      # 5. Run the trading agent                                             #
+      # ------------------------------------------------------------------ #
+      - name: Run trading agent
+        env:
+          ACTIVE_BROKER:        ${{ secrets.ACTIVE_BROKER }}
+          KITE_API_KEY:         ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET:      ${{ secrets.KITE_API_SECRET }}
+          KITE_ACCESS_TOKEN:    ${{ secrets.KITE_ACCESS_TOKEN }}
+          BREEZE_API_KEY:       ${{ secrets.BREEZE_API_KEY }}
+          BREEZE_API_SECRET:    ${{ secrets.BREEZE_API_SECRET }}
+          BREEZE_SESSION_TOKEN: ${{ secrets.BREEZE_SESSION_TOKEN }}
+          INITIAL_BUDGET:       ${{ secrets.INITIAL_BUDGET }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+          DRY_RUN:              ${{ secrets.DRY_RUN }}
+        run: python main.py ${{ steps.run_type.outputs.type }}
+
+      # ------------------------------------------------------------------ #
+      # 6. Commit updated portfolio state and logs back to the repo         #
+      # ------------------------------------------------------------------ #
+      - name: Commit portfolio state & logs
+        run: |
+          git config user.name  "trading-bot"
+          git config user.email "bot@trading-agent"
+          git add state/portfolio_state.json logs/trading_log.csv
+          git diff --staged --quiet || \
+            git commit -m "state: update after ${{ steps.run_type.outputs.type }} run [skip ci]"
+          git push
