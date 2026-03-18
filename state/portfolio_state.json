@@ -1,8 +1,16 @@
 {
-  "capital_remaining": 10000.0,
+  "capital_remaining": 2141.75,
   "profit_booked": 0.0,
   "total_losses_taken": 0.0,
-  "holdings": [],
-  "last_updated": "2026-03-18T01:12:37.905992+05:30",
+  "holdings": [
+    {
+      "symbol": "COALINDIA",
+      "quantity": 17,
+      "buy_price": 462.25,
+      "buy_date": "2026-03-18",
+      "amount_invested": 7858.25
+    }
+  ],
+  "last_updated": "2026-03-18T06:58:08.914079+05:30",
   "trading_day_complete": false
 }
