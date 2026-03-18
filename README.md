@@ -4,7 +4,7 @@
 
 ---
 
-## Table of Contents
+## Table of Contents 
 
 1. [What This Bot Does](#1-what-this-bot-does)
 2. [Project Structure](#2-project-structure)
