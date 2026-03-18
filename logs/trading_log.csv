@@ -3,3 +3,5 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-18T06:57:55.878396+05:30,morning,kite,INFO,,,,,,,,=== Morning session started ===
 2026-03-18T06:58:08.913606+05:30,morning,kite,INFO,,,,,,,,[DRY_RUN] Would BUY COALINDIA x17 @ ₹462.25
 2026-03-18T06:58:08.913968+05:30,morning,kite,BUY_DRY,COALINDIA,17,462.25,DRY_RUN,,0.0,2141.75,amount_invested=7858.25
+2026-03-18T11:05:01.503253+05:30,morning,kite,INFO,,,,,,,,=== Morning session started ===
+2026-03-18T11:05:01.715499+05:30,morning,kite,INFO,,,,,,,,Hard stop-loss triggered for COALINDIA. Selling.
