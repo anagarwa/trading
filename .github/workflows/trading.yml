@@ -2,6 +2,10 @@ name: Trading Agent
 
 on:
   schedule:
+    # NOTE: GitHub Actions cron schedules only activate after the workflow has
+    # been manually triggered at least once on the default branch.
+    # If this is a new repo, do a manual "Run workflow" first, then cron will fire.
+    # GitHub also delays cron by up to 15 min during high load — this is normal.
     - cron: '5 4 * * 1-5'    # 9:35 AM IST  (UTC+5:30 → 04:05 UTC) Mon–Fri
     - cron: '35 6 * * 1-5'   # 12:05 PM IST (06:35 UTC)             Mon–Fri
     - cron: '30 9 * * 1-5'   # 3:00 PM IST  (09:30 UTC)             Mon–Fri
@@ -75,6 +79,7 @@ jobs:
           KITE_API_KEY:         ${{ secrets.KITE_API_KEY }}
           KITE_API_SECRET:      ${{ secrets.KITE_API_SECRET }}
           KITE_ACCESS_TOKEN:    ${{ secrets.KITE_ACCESS_TOKEN }}
+          KITE_TOKEN_DATE:      ${{ secrets.KITE_TOKEN_DATE }}
           BREEZE_API_KEY:       ${{ secrets.BREEZE_API_KEY }}
           BREEZE_API_SECRET:    ${{ secrets.BREEZE_API_SECRET }}
           BREEZE_SESSION_TOKEN: ${{ secrets.BREEZE_SESSION_TOKEN }}
