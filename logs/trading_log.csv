@@ -7,3 +7,6 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-18T11:05:01.715499+05:30,morning,kite,INFO,,,,,,,,Hard stop-loss triggered for COALINDIA. Selling.
 2026-03-18T11:09:28.991903+05:30,morning,kite,INFO,,,,,,,,=== Morning session started ===
 2026-03-18T11:09:42.259304+05:30,morning,kite,BUY,RELIANCE,5,1411.8,260318150698462,,0.0,2941.0,RSI=50.6 MACD_cross=False
+2026-03-18T12:32:47.464354+05:30,midday,kite,INFO,,,,,,,,=== Midday session started ===
+2026-03-18T12:33:00.161286+05:30,midday,kite,INFO,,,,,,,,[MIDDAY ROTATION] RELIANCE | action=hold | Holding RELIANCE (score=0.761). TECHM (score=0.684) does not clear the 1.3x rotation threshold.
+2026-03-18T12:33:00.161499+05:30,midday,kite,INFO,,,,,,,,Midday: holding RELIANCE.
