@@ -1,0 +1,24 @@
+# Cloudflare Worker config for the Trading Agent Scheduler
+# Deploy with: wrangler deploy --config wrangler_scheduler.toml
+#
+# After deploying, set secrets once:
+#   wrangler secret put FINE_GRAINED_PAT --name trading-scheduler
+#   wrangler secret put GITHUB_OWNER     --name trading-scheduler
+#   wrangler secret put GITHUB_REPO      --name trading-scheduler
+#
+# Manual test (HTTP trigger):
+#   curl "https://trading-scheduler.<your-subdomain>.workers.dev/?session=morning"
+#
+# Live log stream:
+#   wrangler tail --name trading-scheduler
+
+name = "trading-scheduler"
+main = "trading_scheduler.js"
+compatibility_date = "2024-01-01"
+
+[triggers]
+crons = [
+  "5 4 * * 1-5",    # 9:35 AM IST  (04:05 UTC)  → morning session  Mon–Fri
+  "35 6 * * 1-5",   # 12:05 PM IST (06:35 UTC)  → midday session   Mon–Fri
+  "30 9 * * 1-5",   # 3:00 PM IST  (09:30 UTC)  → eod session      Mon–Fri
+]
