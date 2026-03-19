@@ -22,3 +22,5 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-19T12:06:28.523969+05:30,midday,kite,INFO,,,,,,,,[MIDDAY ROTATION] RELIANCE | action=rotate | COALINDIA (score=0.911) is 1.5x better than RELIANCE (score=0.625). Rotating.
 2026-03-19T13:01:23.298075+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
 2026-03-19T13:01:23.534896+05:30,eod,kite,INFO,,,,,,,,EOD loss threshold exceeded for RELIANCE (-0.85%). Selling before close.
+2026-03-19T15:01:20.545837+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
+2026-03-19T15:01:20.800365+05:30,eod,kite,INFO,,,,,,,,EOD stop-loss for RELIANCE (-2.37%). Selling.
