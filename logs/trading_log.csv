@@ -31,3 +31,5 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-20T13:50:48.484025+05:30,midday,kite,INFO,,,,,,,,Midday: holding RELIANCE.
 2026-03-20T15:21:16.897017+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
 2026-03-20T15:21:17.157978+05:30,eod,kite,INFO,,,,,,,,EOD: holding RELIANCE overnight. P&L: +0.03% — within acceptable range.
+2026-03-20T15:36:55.084629+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
+2026-03-20T15:36:55.353058+05:30,eod,kite,INFO,,,,,,,,EOD: holding RELIANCE overnight. P&L: +0.18% — within acceptable range.
