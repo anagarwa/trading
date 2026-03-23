@@ -36,3 +36,6 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-23T09:56:14.065263+05:30,morning,kite,INFO,,,,,,,,=== Morning session started ===
 2026-03-23T09:56:20.148812+05:30,morning,kite,INFO,,,,,,,,[MORNING ROTATION] RELIANCE | action=hold | No better Nifty 50 alternative today. Holding RELIANCE (score=0.762).
 2026-03-23T09:56:20.149031+05:30,morning,kite,INFO,,,,,,,,Holding RELIANCE after morning analysis.
+2026-03-23T11:15:02.970006+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
+2026-03-23T11:15:03.210048+05:30,eod,kite,INFO,,,,,,,,EOD loss threshold exceeded for RELIANCE (-1.11%). Selling before close.
+2026-03-23T11:15:03.482951+05:30,eod,kite,SELL,RELIANCE,5,1396.1,260323151024474,EOD_EXIT,-78.5,9921.5,

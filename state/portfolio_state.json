@@ -1,16 +1,8 @@
 {
-  "capital_remaining": 2941.0,
+  "capital_remaining": 9921.5,
   "profit_booked": 0.0,
-  "total_losses_taken": 0.0,
-  "holdings": [
-    {
-      "symbol": "RELIANCE",
-      "quantity": 5,
-      "buy_price": 1411.8,
-      "buy_date": "2026-03-18",
-      "amount_invested": 7059.0
-    }
-  ],
-  "last_updated": "2026-03-23T09:56:20.149136+05:30",
+  "total_losses_taken": 78.5,
+  "holdings": [],
+  "last_updated": "2026-03-23T11:15:03.483107+05:30",
   "trading_day_complete": false
 }
