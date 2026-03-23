@@ -6,8 +6,8 @@ NIFTY50_SYMBOLS = [
     "EICHERMOT",  "GRASIM",     "HCLTECH",    "HDFCBANK",   "HDFCLIFE",
     "HEROMOTOCO", "HINDALCO",   "HINDUNILVR", "ICICIBANK",  "ITC",
     "INDUSINDBK", "INFY",       "JSWSTEEL",   "KOTAKBANK",  "LT",
-    "LTIM",       "M&M",        "MARUTI",     "NTPC",       "NESTLEIND",
+    "LTM",       "M&M",        "MARUTI",     "NTPC",       "NESTLEIND",
     "ONGC",       "POWERGRID",  "RELIANCE",   "SBILIFE",    "SHRIRAMFIN",
-    "SBIN",       "SUNPHARMA",  "TCS",        "TATACONSUM", "TATAMOTORS",
+    "SBIN",       "SUNPHARMA",  "TCS",        "TATACONSUM", "TMPV",
     "TATASTEEL",  "TECHM",      "TITAN",      "ULTRACEMCO", "WIPRO",
 ]
