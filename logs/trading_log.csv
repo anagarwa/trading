@@ -39,3 +39,6 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-23T11:15:02.970006+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
 2026-03-23T11:15:03.210048+05:30,eod,kite,INFO,,,,,,,,EOD loss threshold exceeded for RELIANCE (-1.11%). Selling before close.
 2026-03-23T11:15:03.482951+05:30,eod,kite,SELL,RELIANCE,5,1396.1,260323151024474,EOD_EXIT,-78.5,9921.5,
+2026-03-23T12:05:54.037660+05:30,midday,kite,INFO,,,,,,,,=== Midday session started ===
+2026-03-23T12:05:54.037881+05:30,midday,kite,INFO,,,,,,,,No holdings at midday. Scanning for entry opportunity.
+2026-03-23T12:05:59.772644+05:30,midday,kite,BUY,TECHM,5,1411.6,260323151226916,,0.0,2863.5,RSI=49.9 MACD_cross=False
