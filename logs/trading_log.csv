@@ -42,3 +42,6 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-23T12:05:54.037660+05:30,midday,kite,INFO,,,,,,,,=== Midday session started ===
 2026-03-23T12:05:54.037881+05:30,midday,kite,INFO,,,,,,,,No holdings at midday. Scanning for entry opportunity.
 2026-03-23T12:05:59.772644+05:30,midday,kite,BUY,TECHM,5,1411.6,260323151226916,,0.0,2863.5,RSI=49.9 MACD_cross=False
+2026-03-23T13:15:18.397253+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
+2026-03-23T13:15:18.626754+05:30,eod,kite,INFO,,,,,,,,EOD loss threshold exceeded for TECHM (-1.18%). Selling before close.
+2026-03-23T13:15:18.883599+05:30,eod,kite,SELL,TECHM,5,1394.9,260323151511678,EOD_EXIT,-83.5,9838.0,
