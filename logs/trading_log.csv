@@ -54,3 +54,5 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-24T12:05:39.333882+05:30,midday,kite,INFO,,,,,,,,=== Midday session started ===
 2026-03-24T12:05:52.889646+05:30,midday,kite,INFO,,,,,,,,[MIDDAY ROTATION] RELIANCE | action=hold | Holding RELIANCE (score=0.784). TECHM (score=0.800) does not clear the 1.3x rotation threshold.
 2026-03-24T12:05:52.889851+05:30,midday,kite,INFO,,,,,,,,Midday: holding RELIANCE.
+2026-03-24T15:00:48.438780+05:30,eod,kite,INFO,,,,,,,,=== EOD session started ===
+2026-03-24T15:00:48.664088+05:30,eod,kite,INFO,,,,,,,,EOD: holding RELIANCE overnight. P&L: -0.21% — within acceptable range.
