@@ -78,3 +78,8 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-25T13:21:23.717668+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
 2026-03-25T13:21:37.023965+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50 ROTATION] HSCL | action=hold | Holding HSCL (score=1.698). SPARC (score=1.619) does not clear the 1.3x rotation threshold.
 2026-03-25T13:21:37.024177+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL.
+2026-03-25T15:21:14.010509+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=True) ---
+2026-03-25T15:21:14.269819+05:30,run,kite,INFO,,,,,,,,[NIFTY50] EOD loss threshold for RELIANCE (-0.66%). Selling before close.
+2026-03-25T15:21:14.532053+05:30,run,kite,SELL,RELIANCE,2,1410.7,260325151790127,EOD_EXIT,-18.8,4981.2,pool=nifty50
+2026-03-25T15:21:19.061211+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=True) ---
+2026-03-25T15:21:19.306889+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL overnight. P&L: +0.15%.

@@ -1,17 +1,9 @@
 {
   "nifty50": {
-    "capital_remaining": 2159.8,
+    "capital_remaining": 4981.2,
     "profit_booked": 0.0,
-    "total_losses_taken": 0.0,
-    "holdings": [
-      {
-        "symbol": "RELIANCE",
-        "quantity": 2,
-        "buy_price": 1420.1,
-        "buy_date": "2026-03-25",
-        "amount_invested": 2840.2
-      }
-    ]
+    "total_losses_taken": 18.8,
+    "holdings": []
   },
   "smallcap50": {
     "capital_remaining": 1316.4,
@@ -27,6 +19,6 @@
       }
     ]
   },
-  "last_updated": "2026-03-25T13:21:37.024277+05:30",
+  "last_updated": "2026-03-25T15:21:19.307040+05:30",
   "trading_day_complete": false
 }
