@@ -2,14 +2,14 @@ name: Trading Agent
 
 on:
   # Scheduling is handled by the Cloudflare Worker (cloudflare/trading_scheduler.js).
-  # That worker fires at 9:35 AM, 12:05 PM, and 3:00 PM IST and triggers this
-  # workflow via workflow_dispatch — no GitHub cron needed.
+  # Fires at 9:20 AM, 11:20 AM, 1:20 PM, 3:20 PM IST.
+  # After 3 PM IST, main.py auto-detects sell-only mode.
   workflow_dispatch:
     inputs:
       run_type:
-        description: 'Run type: morning | midday | eod'
+        description: 'Run type (always "run")'
         required: true
-        default: 'morning'
+        default: 'run'
 
 jobs:
   trade:
@@ -47,15 +47,7 @@ jobs:
       - name: Determine run type
         id: run_type
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "type=${{ github.event.inputs.run_type }}" >> "$GITHUB_OUTPUT"
-          else
-            HOUR=$(TZ="Asia/Kolkata" date +%H)
-            if   [ "$HOUR" = "09" ]; then echo "type=morning" >> "$GITHUB_OUTPUT"
-            elif [ "$HOUR" = "12" ]; then echo "type=midday"  >> "$GITHUB_OUTPUT"
-            else                          echo "type=eod"     >> "$GITHUB_OUTPUT"
-            fi
-          fi
+          echo "type=${{ github.event.inputs.run_type || 'run' }}" >> "$GITHUB_OUTPUT"
 
       # ------------------------------------------------------------------ #
       # 4. Market holiday gate — skip if NSE is closed                      #
@@ -93,5 +85,5 @@ jobs:
           git config user.email "bot@trading-agent"
           git add state/portfolio_state.json logs/trading_log.csv
           git diff --staged --quiet || \
-            git commit -m "state: update after ${{ steps.run_type.outputs.type }} run [skip ci]"
+            git commit -m "state: update after trading run [skip ci]"
           git push

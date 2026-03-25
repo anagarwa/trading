@@ -2,13 +2,16 @@
  * Cloudflare Worker — Trading Agent Scheduler
  *
  * Replaces GitHub Actions' unreliable cron scheduler with Cloudflare's
- * highly-reliable cron triggers. Fires at the three IST trading session
- * times and dispatches the corresponding GitHub Actions workflow run.
+ * highly-reliable cron triggers. Fires every 2 hours during market hours
+ * and dispatches the trading GitHub Actions workflow.
+ *
+ * main.py auto-detects sell-only mode when IST hour >= 15.
  *
  * ─── Cron schedule (UTC, set in wrangler_scheduler.toml) ────────────────────
- *   5  4  * * 1-5   →  9:35 AM IST  → morning session
- *   35 6  * * 1-5   → 12:05 PM IST  → midday session
- *   30 9  * * 1-5   →  3:00 PM IST  → eod session
+ *   50 3  * * 1-5   →  9:20 AM IST
+ *   50 5  * * 1-5   → 11:20 AM IST
+ *   50 7  * * 1-5   →  1:20 PM IST
+ *   50 9  * * 1-5   →  3:20 PM IST  (sell-only — auto-detected by main.py)
  *
  * ─── Required Cloudflare Worker secrets ─────────────────────────────────────
  *  FINE_GRAINED_PAT   GitHub fine-grained PAT — same one already stored in
@@ -21,7 +24,7 @@
  *  Option A — Dashboard (easiest):
  *    1. Workers & Pages → Create → Create Worker
  *    2. Paste this file, click Deploy
- *    3. Settings → Triggers → Add Cron Trigger — add the three crons above
+ *    3. Settings → Triggers → Add Cron Trigger — add the four crons above
  *    4. Settings → Variables — add the three encrypted secrets above
  *
  *  Option B — wrangler CLI:
@@ -32,8 +35,7 @@
  *    wrangler secret put GITHUB_REPO      --name trading-scheduler
  *
  * ─── Manual test (HTTP GET) ──────────────────────────────────────────────────
- *  Visit: https://trading-scheduler.<your-subdomain>.workers.dev/?session=morning
- *  Valid values: morning | midday | eod
+ *  Visit: https://trading-scheduler.<your-subdomain>.workers.dev/?confirm=yes
  *  Returns JSON with the GitHub API response.
  *
  * ─── Debugging ───────────────────────────────────────────────────────────────
@@ -42,13 +44,13 @@
  *    or: wrangler tail --name trading-scheduler
  */
 
-// Map each cron schedule string → trading session name.
-// These must exactly match the cron expressions in wrangler_scheduler.toml.
-const CRON_TO_SESSION = {
-  "5 4 * * 1-5":   "morning",
-  "35 6 * * 1-5":  "midday",
-  "30 9 * * 1-5":  "eod",
-};
+// All crons dispatch `run_type=run`; sell-only is auto-detected by main.py.
+const VALID_CRONS = new Set([
+  "50 3 * * 1-5",
+  "50 5 * * 1-5",
+  "50 7 * * 1-5",
+  "50 9 * * 1-5",
+]);
 
 export default {
 
@@ -58,30 +60,26 @@ export default {
     console.log(`[scheduler] Cron expression triggered: "${event.cron}"`);
     console.log(`[scheduler] Scheduled time (UTC): ${new Date(event.scheduledTime).toISOString()}`);
 
-    const session = CRON_TO_SESSION[event.cron];
-
-    if (!session) {
-      console.error(`[scheduler] FAIL — No session mapped for cron "${event.cron}".`);
-      console.error("[scheduler] Check that CRON_TO_SESSION keys exactly match wrangler_scheduler.toml triggers.");
+    if (!VALID_CRONS.has(event.cron)) {
+      console.error(`[scheduler] FAIL — Unexpected cron "${event.cron}".`);
+      console.error("[scheduler] Check that wrangler_scheduler.toml triggers match VALID_CRONS.");
       return;
     }
 
-    console.log(`[scheduler] Mapped "${event.cron}" → session="${session}"`);
-    await dispatchTradingWorkflow(session, env);
+    console.log(`[scheduler] Dispatching run_type="run" for cron "${event.cron}"`);
+    await dispatchTradingWorkflow(env);
   },
 
   // ── Fetch handler (manual HTTP trigger for testing) ───────────────────────
   async fetch(request, env, ctx) {
     const url     = new URL(request.url);
-    const session = url.searchParams.get("session");
+    const confirm = url.searchParams.get("confirm");
 
     console.log("=== Trading Scheduler (HTTP) ===");
-    console.log(`[scheduler] Manual trigger request. session param="${session || "(none)"}"`);
+    console.log(`[scheduler] Manual trigger request. confirm="${confirm || "(none)"}"`);
 
-    const valid = ["morning", "midday", "eod"];
-
-    if (!session || !valid.includes(session)) {
-      const msg = `Missing or invalid ?session= param. Valid values: ${valid.join(" | ")}`;
+    if (confirm !== "yes") {
+      const msg = 'Pass ?confirm=yes to dispatch a trading run.';
       console.warn(`[scheduler] ${msg}`);
       return new Response(JSON.stringify({ error: msg }), {
         status: 400,
@@ -89,7 +87,7 @@ export default {
       });
     }
 
-    const result = await dispatchTradingWorkflow(session, env);
+    const result = await dispatchTradingWorkflow(env);
     return new Response(JSON.stringify(result), {
       status: result.ok ? 200 : 502,
       headers: { "Content-Type": "application/json" },
@@ -99,7 +97,7 @@ export default {
 
 // ── Core dispatch function ─────────────────────────────────────────────────
 
-async function dispatchTradingWorkflow(session, env) {
+async function dispatchTradingWorkflow(env) {
   const { FINE_GRAINED_PAT, GITHUB_OWNER, GITHUB_REPO } = env;
 
   // ── Validate secrets ───────────────────────────────────────────────────────
@@ -121,11 +119,11 @@ async function dispatchTradingWorkflow(session, env) {
     `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}` +
     `/actions/workflows/trading.yml/dispatches`;
 
-  console.log(`[scheduler] Dispatching session="${session}" to ${dispatchUrl}`);
+  console.log(`[scheduler] Dispatching run_type="run" to ${dispatchUrl}`);
 
   const body = JSON.stringify({
     ref: "main",
-    inputs: { run_type: session },
+    inputs: { run_type: "run" },
   });
 
   let response;
@@ -149,9 +147,9 @@ async function dispatchTradingWorkflow(session, env) {
 
   // HTTP 204 = GitHub accepted the workflow dispatch
   if (response.status === 204) {
-    console.log(`[scheduler] SUCCESS — GitHub accepted dispatch for session="${session}".`);
+    console.log('[scheduler] SUCCESS — GitHub accepted dispatch for run_type="run".');
     console.log("[scheduler] trading.yml is now queued in GitHub Actions.");
-    return { ok: true, session, status: 204 };
+    return { ok: true, run_type: "run", status: 204 };
   }
 
   // Error — read body for diagnostics
@@ -179,5 +177,5 @@ async function dispatchTradingWorkflow(session, env) {
     console.error("  — GitHub Actions may be disabled for this repository.");
   }
 
-  return { ok: false, session, status: response.status, error: errorBody.slice(0, 400) };
+  return { ok: false, run_type: "run", status: response.status, error: errorBody.slice(0, 400) };
 }

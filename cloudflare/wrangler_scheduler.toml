@@ -7,7 +7,7 @@
 #   wrangler secret put GITHUB_REPO      --name trading-scheduler
 #
 # Manual test (HTTP trigger):
-#   curl "https://trading-scheduler.<your-subdomain>.workers.dev/?session=morning"
+#   curl "https://trading-scheduler.<your-subdomain>.workers.dev/?confirm=yes"
 #
 # Live log stream:
 #   wrangler tail --name trading-scheduler
@@ -18,7 +18,8 @@ compatibility_date = "2024-01-01"
 
 [triggers]
 crons = [
-  "5 4 * * 1-5",    # 9:35 AM IST  (04:05 UTC)  → morning session  Mon–Fri
-  "35 6 * * 1-5",   # 12:05 PM IST (06:35 UTC)  → midday session   Mon–Fri
-  "30 9 * * 1-5",   # 3:00 PM IST  (09:30 UTC)  → eod session      Mon–Fri
+  "50 3 * * 1-5",   #  9:20 AM IST (03:50 UTC) Mon–Fri
+  "50 5 * * 1-5",   # 11:20 AM IST (05:50 UTC) Mon–Fri
+  "50 7 * * 1-5",   #  1:20 PM IST (07:50 UTC) Mon–Fri
+  "50 9 * * 1-5",   #  3:20 PM IST (09:50 UTC) Mon–Fri — sell-only
 ]

@@ -15,6 +15,20 @@ class BaseBroker(ABC):
     def get_nifty50_quotes(self) -> list[dict]:
         """Return quotes for all 50 Nifty 50 constituents."""
 
+    def get_quotes_for_symbols(self, symbols: list[str]) -> list[dict]:
+        """
+        Return quotes for an arbitrary list of NSE symbols.
+        Default implementation calls get_quote() per symbol.
+        Subclasses should override for batch efficiency.
+        """
+        result = []
+        for sym in symbols:
+            try:
+                result.append(self.get_quote(sym))
+            except Exception:
+                pass
+        return result
+
     @abstractmethod
     def place_market_buy(self, symbol: str, quantity: int) -> dict:
         """Place market buy order. Return {order_id, symbol, quantity, status}"""

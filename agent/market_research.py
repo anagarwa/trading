@@ -7,7 +7,7 @@ import yfinance as yf
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator
 
-from constants import NIFTY50_SYMBOLS
+from constants import NIFTY50_SYMBOLS, NIFTY_SMALLCAP_50_SYMBOLS
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,9 @@ ROTATION_SCORE_PREMIUM = 1.30
 
 class MarketResearch:
 
-    def __init__(self, broker):
+    def __init__(self, broker, stock_universe: list[str] | None = None):
         self.broker = broker
+        self.stock_universe = stock_universe or NIFTY50_SYMBOLS
 
     # ------------------------------------------------------------------
     # Data fetching helpers
@@ -229,8 +230,8 @@ class MarketResearch:
         projected_capital: float,
     ) -> dict:
         """
-        Compare the currently held stock against every other Nifty 50 stock and
-        decide whether to hold or rotate into a better opportunity.
+        Compare the currently held stock against every other stock in this
+        research instance's universe and decide whether to hold or rotate.
 
         Returns a dict:
           {
@@ -240,11 +241,6 @@ class MarketResearch:
             'best_candidate': dict | None,
             'reason':        str,
           }
-
-        action meanings:
-          hold           — keep the existing position
-          rotate         — sell held stock, buy best_candidate immediately
-          sell_no_replace — sell held stock; no suitable replacement found, wait
         """
         # 1. Full analysis of the currently held stock
         held_analysis = self.analyse_stock(held_symbol)
@@ -307,7 +303,7 @@ class MarketResearch:
                 "held_score": held_score,
                 "held_analysis": held_analysis,
                 "best_candidate": None,
-                "reason": f"No better Nifty 50 alternative today. Holding {held_symbol} (score={held_score:.3f}).",
+                "reason": f"No better alternative today. Holding {held_symbol} (score={held_score:.3f}).",
             }
 
         alt_score = best.get("score", 0.0)
@@ -352,13 +348,10 @@ class MarketResearch:
         exclude_symbol: str | None = None,
     ) -> dict | None:
         """
-        Scan all Nifty 50 stocks and return the single best buy candidate that
-        satisfies all criteria, or None if no qualifying stock is found.
-
-        exclude_symbol: skip this symbol (used during rotation to exclude the
-                        stock we are considering selling).
+        Scan all stocks in this research instance's universe and return the
+        single best buy candidate, or None if no qualifying stock is found.
         """
-        quotes = self.broker.get_nifty50_quotes()
+        quotes = self.broker.get_quotes_for_symbols(self.stock_universe)
         quote_map = {q["symbol"]: q for q in quotes}
 
         # Identify the worst-performing stock of the day as a rough sector proxy
@@ -369,7 +362,7 @@ class MarketResearch:
 
         candidates: list[dict] = []
 
-        for symbol in NIFTY50_SYMBOLS:
+        for symbol in self.stock_universe:
             try:
                 # Skip excluded symbol (e.g. the stock we are about to sell)
                 if exclude_symbol and symbol == exclude_symbol:
@@ -445,7 +438,7 @@ class MarketResearch:
                 continue
 
         if not candidates:
-            logger.info("No qualifying buy candidates found in Nifty 50 today.")
+            logger.info(f"No qualifying buy candidates found in {len(self.stock_universe)}-stock universe today.")
             return None
 
         candidates.sort(key=lambda c: c["score"], reverse=True)

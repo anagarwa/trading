@@ -26,11 +26,12 @@
 
 This is a fully automated, rules-based equity trading agent for the Indian stock market (NSE). It:
 
-- Runs **three times a day** on weekdays via GitHub Actions (or locally) — at market open, midday, and end-of-day.
-- Scans all **Nifty 50 stocks** and picks the single best buy opportunity using technical analysis + a news filter.
-- Manages a **fixed pool of ₹10,000** with strict capital protection rules.
-- Holds **at most one stock at a time** (delivery/CNC trades only — no F&O, no intraday leverage).
+- Runs **four times a day** on weekdays via Cloudflare Worker cron → GitHub Actions — at 9:20 AM, 11:20 AM, 1:20 PM, and 3:20 PM IST.
+- Manages **two independent capital pools**: **₹5,000 in Nifty 50** stocks and **₹5,000 in Nifty Smallcap 50** stocks — both processed in a single GitHub Actions run.
+- Scans each pool's stock universe and picks the single best buy opportunity per pool using technical analysis + a news filter.
+- Holds **at most one stock per pool** (delivery/CNC trades only — no F&O, no intraday leverage).
 - Automatically **books profits** at +2.5% and **cuts losses** at -1.5%.
+- **After 3 PM IST**, only sells — the 3:20 PM run auto-detects sell-only mode (no new buys).
 - Sends **Telegram alerts** for every buy, sell, skip, and error.
 - Persists all state in `state/portfolio_state.json` and an append-only `logs/trading_log.csv`.
 - Supports **two brokers** out of the box: **Zerodha Kite Connect** and **ICICI Direct Breeze Connect**, switchable with a single environment variable.
@@ -226,40 +227,43 @@ These rules are enforced in code and cannot be bypassed, even accidentally.
 
 | Rule | Detail |
 |---|---|
-| **Fixed capital pool** | Bot starts with `INITIAL_BUDGET` (default ₹10,000). This is the only pool available for new trades. |
-| **Profits are sacred** | Realised profits go into `profit_booked` and are **never re-invested**. Capital is only replenished by the original amount invested, not the profit. |
-| **Losses permanently reduce capital** | If a trade loses ₹500, capital_remaining becomes ₹9,500. All future trades are sized against ₹9,500. |
-| **One position at a time** | The bot never holds more than one stock simultaneously. |
-| **Minimum capital to trade** | If capital_remaining < ₹500, no buy scan is performed. |
-| **Max trade size** | 80% of capital_remaining (configurable via `MAX_SINGLE_TRADE_PCT`). |
+| **Two capital pools** | ₹5,000 for Nifty 50, ₹5,000 for Nifty Smallcap 50 (configurable via `NIFTY50_BUDGET` / `SMALLCAP50_BUDGET`). Each pool is tracked independently. |
+| **Profits are sacred** | Realised profits go into each pool's `profit_booked` and are **never re-invested**. Capital is only replenished by the original amount invested, not the profit. |
+| **Losses permanently reduce pool capital** | If a trade in the smallcap pool loses ₹500, that pool's capital_remaining becomes ₹4,500. Does not affect the Nifty 50 pool. |
+| **One position per pool** | Each pool holds at most one stock. Total portfolio can hold up to 2 stocks simultaneously. |
+| **Minimum capital to trade** | If a pool's capital_remaining < ₹500, no buy scan is performed for that pool. |
+| **Max trade size** | 80% of pool's capital_remaining (configurable via `MAX_SINGLE_TRADE_PCT`). |
 | **Stop-loss** | Mandatory sell if loss ≥ 1.5% (configurable via `STOP_LOSS_PCT`). |
 | **Profit target** | Sell when gain ≥ 2.5% (configurable via `PROFIT_TARGET_PCT`). |
-| **EOD loss limit** | At 3 PM if loss ≥ 0.5%, sell before close to avoid a bad overnight hold (configurable via `EOD_LOSS_THRESHOLD`). |
-| **Capital guard** | Before every buy, the code verifies `amount_to_invest ≤ capital_remaining`. If this assertion fails, the trade is aborted with an error. |
+| **EOD loss limit** | After 3 PM if loss ≥ 0.5%, sell before close to avoid a bad overnight hold (configurable via `EOD_LOSS_THRESHOLD`). |
+| **Capital guard** | Before every buy, the code verifies `amount_to_invest ≤ pool.capital_remaining`. If this assertion fails, the trade is aborted with an error. |
 
 ---
 
 ## 6. Trading Sessions (When It Runs)
 
-The bot runs three times per trading day via GitHub Actions cron:
+The bot runs four times per trading day via Cloudflare Worker cron → GitHub Actions:
 
-| Session | IST Time | What It Does |
+| IST Time | UTC Cron | Behaviour |
 |---|---|---|
-| **Morning** | 9:35 AM | Hard stop-loss check → profit-target check → **rotation analysis** (compare held stock vs all Nifty 50) → buy if no holdings |
-| **Midday** | 12:05 PM | Same as morning: hard stop-loss → profit-target → **rotation analysis** → buy if no holdings |
-| **EOD** | 3:00 PM | **Sell-only.** Stop-loss / profit-target / EOD loss threshold. If sold, goes flat — no buy scan. Next day's morning session finds a new trade. |
+| **9:20 AM** | `50 3 * * 1-5` | Full analysis: stop-loss → profit-target → rotation → buy if no holdings |
+| **11:20 AM** | `50 5 * * 1-5` | Same as 9:20 AM |
+| **1:20 PM** | `50 7 * * 1-5` | Same as 9:20 AM |
+| **3:20 PM** | `50 9 * * 1-5` | **Sell-only.** Stop-loss / profit-target / EOD loss threshold. No buy scan. |
+
+Each run processes **both pools** (Nifty 50 and Smallcap 50) sequentially in a single GitHub Actions job. After 3 PM IST, `main.py` auto-detects sell-only mode (`SELL_ONLY = True` when IST hour ≥ 15).
 
 **Market Holiday Guard:** Before every run, `scripts/check_market_open.py` checks if today is an NSE trading holiday (weekend or declared holiday). If the market is closed, the entire workflow exits early — no code runs, no state changes.
 
-### Rotation Logic (Morning & Midday)
+### Rotation Logic (Before 3 PM)
 
-At every morning and midday session, if the bot holds a stock it does not simply ask "hold or sell?" — it asks **"is this still the best stock I could be holding right now?"**
+At every run before 3 PM, if a pool holds a stock it does not simply ask "hold or sell?" — it asks **"is this still the best stock I could be holding right now?"**
 
 The rotation pipeline:
 
-1. **Hard exits first** — Stop-loss or profit-target triggered → sell, immediately buy the best available replacement.
+1. **Hard exits first** — Stop-loss or profit-target triggered → sell, immediately buy the best available replacement from the pool's stock universe.
 2. **Score the held stock** using the same technical indicators (RSI, MACD, EMA), but with slightly more lenient thresholds to avoid unnecessary churn.
-3. **Score every other Nifty 50 stock** using the standard buy criteria.
+3. **Score every other stock in the pool's universe** using the standard buy criteria.
 4. **Rotate only if** the best alternative scores ≥ 30% higher than the held stock (`ROTATION_SCORE_PREMIUM = 1.30`). The 30% premium accounts for brokerage and slippage costs.
 5. **If held stock fails basic hold criteria** (RSI extremes, price > 2% below EMA20, negative news) → mandatory exit regardless of alternatives. If a replacement is found, rotate; otherwise sit in cash.
 6. **If no alternative beats the threshold** → keep holding.
@@ -305,14 +309,8 @@ INITIAL_BUDGET=10000
 ### Step 3 — Run locally
 
 ```bash
-# Simulate the morning session (9:35 AM logic)
-python main.py morning
-
-# Simulate the midday session
-python main.py midday
-
-# Simulate the EOD session
-python main.py eod
+# Run the trading agent (processes both Nifty 50 and Smallcap 50 pools)
+python main.py run
 ```
 
 ### Step 4 — Review the output
@@ -328,14 +326,22 @@ cat state/portfolio_state.json
 ### Step 5 — Reset the portfolio for a fresh dry-run period
 
 ```bash
-# Reset capital to ₹10,000 and clear all holdings
+# Reset both pools to ₹5,000 and clear all holdings
 cat > state/portfolio_state.json << 'EOF'
 {
-  "capital_remaining": 10000.00,
-  "profit_booked": 0.00,
-  "total_losses_taken": 0.00,
-  "holdings": [],
-  "last_updated": "2026-03-15T00:00:00+05:30",
+  "nifty50": {
+    "capital_remaining": 5000.00,
+    "profit_booked": 0.00,
+    "total_losses_taken": 0.00,
+    "holdings": []
+  },
+  "smallcap50": {
+    "capital_remaining": 5000.00,
+    "profit_booked": 0.00,
+    "total_losses_taken": 0.00,
+    "holdings": []
+  },
+  "last_updated": "",
   "trading_day_complete": false
 }
 EOF
@@ -367,11 +373,19 @@ Edit `state/portfolio_state.json` to reflect your actual starting capital:
 
 ```json
 {
-  "capital_remaining": 10000.00,
-  "profit_booked": 0.00,
-  "total_losses_taken": 0.00,
-  "holdings": [],
-  "last_updated": "2026-03-15T00:00:00+05:30",
+  "nifty50": {
+    "capital_remaining": 5000.00,
+    "profit_booked": 0.00,
+    "total_losses_taken": 0.00,
+    "holdings": []
+  },
+  "smallcap50": {
+    "capital_remaining": 5000.00,
+    "profit_booked": 0.00,
+    "total_losses_taken": 0.00,
+    "holdings": []
+  },
+  "last_updated": "",
   "trading_day_complete": false
 }
 ```
@@ -403,7 +417,7 @@ Confirm all of the following secrets are set in **GitHub → Settings → Secret
 
 ### Step 5 — Do a manual workflow dispatch test
 
-In GitHub → Actions → **Trading Agent** → **Run workflow**, select `morning` and verify a real order gets placed (or check logs if you used a limit of 1 share of the cheapest Nifty 50 stock for the first real test).
+In GitHub → Actions → **Trading Agent** → **Run workflow**, select `run` and verify real orders get placed (or check logs if using DRY_RUN for a first test).
 
 ---
 

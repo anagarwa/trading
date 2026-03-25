@@ -6,9 +6,12 @@ import pytz
 from kiteconnect import KiteConnect
 
 from broker.base_broker import BaseBroker
-from constants import NIFTY50_SYMBOLS
+from constants import NIFTY50_SYMBOLS, NIFTY_SMALLCAP_50_SYMBOLS
 
 logger = logging.getLogger(__name__)
+
+# All symbols the broker needs to map instrument tokens for.
+ALL_TRACKED_SYMBOLS = set(NIFTY50_SYMBOLS) | set(NIFTY_SMALLCAP_50_SYMBOLS)
 
 
 class KiteBroker(BaseBroker):
@@ -38,12 +41,12 @@ class KiteBroker(BaseBroker):
         return True
 
     def _load_instrument_tokens(self):
-        """Build symbol → instrument_token map for all Nifty 50 stocks."""
+        """Build symbol → instrument_token map for all tracked stocks."""
         instruments = self.kite.instruments("NSE")
         for inst in instruments:
-            if inst["tradingsymbol"] in NIFTY50_SYMBOLS:
+            if inst["tradingsymbol"] in ALL_TRACKED_SYMBOLS:
                 self._instrument_tokens[inst["tradingsymbol"]] = inst["instrument_token"]
-        missing = set(NIFTY50_SYMBOLS) - set(self._instrument_tokens.keys())
+        missing = ALL_TRACKED_SYMBOLS - set(self._instrument_tokens.keys())
         if missing:
             logger.warning(f"Instrument tokens not found for: {missing}")
 
@@ -70,6 +73,31 @@ class KiteBroker(BaseBroker):
         quotes = self.kite.quote(full_symbols)
         result = []
         for sym in NIFTY50_SYMBOLS:
+            full_sym = f"NSE:{sym}"
+            if full_sym not in quotes:
+                logger.warning(f"Quote missing for {sym}")
+                continue
+            q = quotes[full_sym]
+            ltp = q["last_price"]
+            prev_close = q["ohlc"]["close"]
+            change_pct = ((ltp - prev_close) / prev_close * 100) if prev_close else 0.0
+            result.append({
+                "symbol": sym,
+                "ltp": ltp,
+                "open": q["ohlc"]["open"],
+                "high": q["ohlc"]["high"],
+                "low": q["ohlc"]["low"],
+                "volume": q["volume"],
+                "change_pct": round(change_pct, 4),
+            })
+        return result
+
+    def get_quotes_for_symbols(self, symbols: list[str]) -> list[dict]:
+        """Batch-fetch quotes for an arbitrary list of NSE symbols."""
+        full_symbols = [f"NSE:{s}" for s in symbols]
+        quotes = self.kite.quote(full_symbols)
+        result = []
+        for sym in symbols:
             full_sym = f"NSE:{sym}"
             if full_sym not in quotes:
                 logger.warning(f"Quote missing for {sym}")

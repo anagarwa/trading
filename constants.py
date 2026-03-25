@@ -11,3 +11,18 @@ NIFTY50_SYMBOLS = [
     "SBIN",       "SUNPHARMA",  "TCS",        "TATACONSUM", "TMPV",
     "TATASTEEL",  "TECHM",      "TITAN",      "ULTRACEMCO", "WIPRO",
 ]
+
+# Nifty Smallcap 50 constituents (NSE trading symbols)
+# Source: NSE index constituent list — verify periodically for rebalancing.
+NIFTY_SMALLCAP_50_SYMBOLS = [
+    "360ONE",     "AAVAS",      "ACE",        "ANGELONE",   "APLAPOLLO",
+    "BIKAJI",     "CASTROLIND", "CELLO",      "CENTRALBK",  "CDSL",
+    "COCHINSHIP", "CYIENT",     "DOMS",       "FIVESTAR",   "GRINDWELL",
+    "HAPPSTMNDS", "HSCL",       "IIFL",       "IRFC",       "JKCEMENT",
+    "JYOTHYLAB",  "KALYANKJIL", "KPITTECH",   "LICI",       "MANAPPURAM",
+    "METROPOLIS", "NAM-INDIA",  "NATCOPHARM", "NHPC",       "OLECTRA",
+    "PNBHOUSING", "PVRINOX",    "RADICO",     "RVNL",       "SJVN",
+    "SPARC",      "TANLA",      "TATACHEM",   "TATAELXSI",  "TIINDIA",
+    "TRIDENT",    "UNIONBANK",  "VGUARD",     "VSTIND",     "WELSPUNLIV",
+    "WHIRLPOOL",  "ZEEL",       "KFINTECH",   "CLEAN",      "MAPMYINDIA",
+]

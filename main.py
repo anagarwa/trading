@@ -1,10 +1,16 @@
 """
 main.py — Trading Agent Entry Point
 
-Called by GitHub Actions as:
-    python main.py morning   # 9:35 AM IST
-    python main.py midday    # 12:05 PM IST
-    python main.py eod       # 3:00 PM IST
+Called by GitHub Actions (via Cloudflare Worker scheduler) as:
+    python main.py run        # Every 2 hours starting 9:20 AM IST
+
+The bot auto-detects whether it's before or after 3 PM IST:
+  - Before 3 PM: full analysis (stop-loss, profit-target, rotation, buy)
+  - After 3 PM:  sell-only (stop-loss, profit-target, EOD exit — no new buys)
+
+Two independent pools are processed in each run:
+  - nifty50:    trades from Nifty 50 constituents   (₹5,000 default)
+  - smallcap50: trades from Nifty Smallcap 50       (₹5,000 default)
 """
 
 import csv
@@ -19,8 +25,9 @@ from config import ACTIVE_BROKER, DRY_RUN
 from broker import get_broker
 from agent.market_research import MarketResearch
 from agent.notifications import notify_buy, notify_error, notify_sell, notify_skip
-from agent.portfolio import Portfolio
+from agent.portfolio import Portfolio, PoolPortfolio
 from agent.risk_manager import RiskManager
+from constants import NIFTY50_SYMBOLS, NIFTY_SMALLCAP_50_SYMBOLS
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -36,15 +43,22 @@ logger = logging.getLogger(__name__)
 # Run-type validation
 # ---------------------------------------------------------------------------
 if len(sys.argv) < 2:
-    logger.error("Usage: python main.py <morning|midday|eod>")
+    logger.error("Usage: python main.py <run>")
     sys.exit(1)
 
 RUN_TYPE = sys.argv[1].strip().lower()
-if RUN_TYPE not in ("morning", "midday", "eod"):
-    logger.error(f"Invalid RUN_TYPE '{RUN_TYPE}'. Expected: morning | midday | eod")
+if RUN_TYPE not in ("run", "morning", "midday", "eod"):
+    logger.error(f"Invalid RUN_TYPE '{RUN_TYPE}'. Expected: run (or legacy: morning|midday|eod)")
     sys.exit(1)
 
 IST = pytz.timezone("Asia/Kolkata")
+
+# Determine sell-only mode: after 3 PM IST, no new buys
+_now_ist = datetime.now(IST)
+SELL_ONLY = _now_ist.hour >= 15
+# Legacy compatibility: explicit eod run_type also forces sell-only
+if RUN_TYPE == "eod":
+    SELL_ONLY = True
 LOG_FILE = "logs/trading_log.csv"
 LOG_HEADERS = [
     "timestamp", "run_type", "broker", "action",
@@ -136,15 +150,15 @@ def _check_kite_token_freshness():
 # Trade execution helpers
 # ---------------------------------------------------------------------------
 
-def execute_buy(broker, portfolio: Portfolio, candidate: dict):
+def execute_buy(broker, pool: PoolPortfolio, candidate: dict):
     risk = RiskManager()
-    max_invest = risk.max_investment(portfolio.capital_remaining)
+    max_invest = risk.max_investment(pool.capital_remaining)
     ltp = candidate["ltp"]
     quantity = int(max_invest // ltp)
 
     if quantity < 1:
         msg = (
-            f"Skipping {candidate['symbol']} — insufficient capital for 1 share "
+            f"[{pool.pool_name}] Skipping {candidate['symbol']} — insufficient capital for 1 share "
             f"(ltp=₹{ltp:,.2f}, max_invest=₹{max_invest:,.2f})."
         )
         log_info(msg)
@@ -155,64 +169,62 @@ def execute_buy(broker, portfolio: Portfolio, candidate: dict):
     symbol = candidate["symbol"]
 
     if DRY_RUN:
-        log_info(f"[DRY_RUN] Would BUY {symbol} x{quantity} @ ₹{ltp:.2f}")
-        portfolio.record_buy(symbol, quantity, ltp)
+        log_info(f"[{pool.pool_name}][DRY_RUN] Would BUY {symbol} x{quantity} @ ₹{ltp:.2f}")
+        pool.record_buy(symbol, quantity, ltp)
         log_trade(
             "BUY_DRY", symbol, quantity, ltp,
             order_id="DRY_RUN",
-            capital_remaining=portfolio.capital_remaining,
-            notes=f"amount_invested={amount_invested}",
+            capital_remaining=pool.capital_remaining,
+            notes=f"pool={pool.pool_name} amount_invested={amount_invested}",
         )
-        notify_buy(symbol, quantity, ltp, amount_invested, portfolio.capital_remaining)
+        notify_buy(symbol, quantity, ltp, amount_invested, pool.capital_remaining)
         return
 
     order = broker.place_market_buy(symbol, quantity)
-    portfolio.record_buy(symbol, quantity, ltp)
+    pool.record_buy(symbol, quantity, ltp)
     notes = (
-        f"RSI={candidate.get('rsi', 'N/A'):.1f} "
+        f"pool={pool.pool_name} RSI={candidate.get('rsi', 'N/A'):.1f} "
         f"MACD_cross={candidate.get('macd_cross', False)}"
     )
     log_trade(
         "BUY", symbol, quantity, ltp,
         order_id=order["order_id"],
-        capital_remaining=portfolio.capital_remaining,
+        capital_remaining=pool.capital_remaining,
         notes=notes,
     )
-    notify_buy(symbol, quantity, ltp, amount_invested, portfolio.capital_remaining)
+    notify_buy(symbol, quantity, ltp, amount_invested, pool.capital_remaining)
 
 
-def execute_sell(broker, portfolio: Portfolio, holding: dict, quote: dict, reason: str):
+def execute_sell(broker, pool: PoolPortfolio, holding: dict, quote: dict, reason: str):
     symbol = holding["symbol"]
     quantity = holding["quantity"]
     sell_price = quote["ltp"]
     pnl = round((sell_price - holding["buy_price"]) * quantity, 2)
 
-    # PORTFOLIO ISOLATION: the bot only sells positions it recorded in portfolio_state.json.
-    # It never reads the broker's full account positions. This guarantees the bot
-    # cannot accidentally touch shares you bought manually outside this system.
-
     if DRY_RUN:
         log_info(
-            f"[DRY_RUN] Would SELL {symbol} x{quantity} @ ₹{sell_price:.2f} "
+            f"[{pool.pool_name}][DRY_RUN] Would SELL {symbol} x{quantity} @ ₹{sell_price:.2f} "
             f"reason={reason} pnl=₹{pnl:.2f}"
         )
-        portfolio.record_sell(symbol, sell_price, pnl)
+        pool.record_sell(symbol, sell_price, pnl)
         log_trade(
             "SELL_DRY", symbol, quantity, sell_price,
             order_id="DRY_RUN", reason=reason, pnl=pnl,
-            capital_remaining=portfolio.capital_remaining,
+            capital_remaining=pool.capital_remaining,
+            notes=f"pool={pool.pool_name}",
         )
-        notify_sell(symbol, reason, pnl, portfolio.capital_remaining, portfolio.profit_booked)
+        notify_sell(symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
         return
 
     order = broker.place_market_sell(symbol, quantity)
-    portfolio.record_sell(symbol, sell_price, pnl)
+    pool.record_sell(symbol, sell_price, pnl)
     log_trade(
         "SELL", symbol, quantity, sell_price,
         order_id=order["order_id"], reason=reason, pnl=pnl,
-        capital_remaining=portfolio.capital_remaining,
+        capital_remaining=pool.capital_remaining,
+        notes=f"pool={pool.pool_name}",
     )
-    notify_sell(symbol, reason, pnl, portfolio.capital_remaining, portfolio.profit_booked)
+    notify_sell(symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
 
 
 # ---------------------------------------------------------------------------
@@ -220,181 +232,107 @@ def execute_sell(broker, portfolio: Portfolio, holding: dict, quote: dict, reaso
 # ---------------------------------------------------------------------------
 
 
-def _try_buy_best_candidate(broker, portfolio: Portfolio, research: MarketResearch,
+def _try_buy_best_candidate(broker, pool: PoolPortfolio, research: MarketResearch,
                              exclude_symbol: str | None = None):
-    """Shared helper: find the best Nifty 50 buy candidate and execute the buy."""
-    if portfolio.capital_remaining < 500:
-        msg = f"Capital ₹{portfolio.capital_remaining:.2f} < ₹500. Skipping buy scan."
+    """Shared helper: find the best buy candidate and execute the buy."""
+    if pool.capital_remaining < 500:
+        msg = f"[{pool.pool_name}] Capital ₹{pool.capital_remaining:.2f} < ₹500. Skipping buy scan."
         log_info(msg)
         notify_skip(msg)
         return
     candidate = research.find_best_buy_candidate(
-        capital_remaining=portfolio.capital_remaining,
+        capital_remaining=pool.capital_remaining,
         exclude_symbol=exclude_symbol,
     )
     if candidate:
-        execute_buy(broker, portfolio, candidate)
+        execute_buy(broker, pool, candidate)
     else:
-        msg = "No qualifying buy candidate found in Nifty 50."
+        msg = f"[{pool.pool_name}] No qualifying buy candidate found."
         log_info(msg)
         notify_skip(msg)
 
 
-def run_morning_session(broker, portfolio: Portfolio, risk: RiskManager, research: MarketResearch):
+def process_pool(broker, pool: PoolPortfolio, risk: RiskManager,
+                 research: MarketResearch, sell_only: bool):
     """
-    9:35 AM
-    If holding:
-      1. Hard stop-loss check — sell immediately, then look for replacement.
-      2. Profit-target check — book profit, then look for replacement.
-      3. Rotation analysis — compare held stock vs every other Nifty 50 stock.
-         Rotate only if an alternative scores 30% better (guards against churn).
-    If not holding: scan for best buy candidate.
-    """
-    log_info("=== Morning session started ===")
+    Process a single capital pool (nifty50 or smallcap50).
 
-    if portfolio.has_holdings():
-        for holding in list(portfolio.holdings):
+    sell_only=False (before 3 PM):
+      If holding: stop-loss → profit-target → rotation analysis → buy replacement.
+      If not holding: scan for best buy candidate.
+
+    sell_only=True (after 3 PM):
+      If holding: stop-loss / profit-target / EOD loss threshold.
+      No buy scan at all.
+    """
+    pool_label = pool.pool_name.upper()
+    log_info(f"--- Processing pool: {pool_label} (sell_only={sell_only}) ---")
+
+    if pool.has_holdings():
+        for holding in list(pool.holdings):
             quote = broker.get_quote(holding["symbol"])
             ltp = quote["ltp"]
+            pnl_pct = risk.current_pnl_pct(holding["buy_price"], ltp)
 
-            # --- Hard stop-loss: mandatory, no further comparison ---
+            # --- Hard stop-loss: mandatory ---
             if risk.should_stop_loss(holding["buy_price"], ltp):
-                log_info(f"Hard stop-loss triggered for {holding['symbol']}. Selling.")
-                execute_sell(broker, portfolio, holding, quote, reason="STOP_LOSS")
-                _try_buy_best_candidate(broker, portfolio, research,
-                                        exclude_symbol=holding["symbol"])
-                return
-
-            # --- Profit target: book profit, look for next best trade ---
-            if risk.should_book_profit(holding["buy_price"], ltp):
-                pnl_pct = risk.current_pnl_pct(holding["buy_price"], ltp)
-                log_info(f"Profit target hit for {holding['symbol']} (+{pnl_pct:.2f}%). Booking profit.")
-                execute_sell(broker, portfolio, holding, quote, reason="PROFIT_TARGET")
-                _try_buy_best_candidate(broker, portfolio, research,
-                                        exclude_symbol=holding["symbol"])
-                return
-
-            # --- Rotation analysis: is there a significantly better stock? ---
-            # Project capital available if we were to sell the held stock now.
-            projected_capital = portfolio.capital_remaining + holding["amount_invested"]
-            rotation = research.find_best_rotation_candidate(
-                held_symbol=holding["symbol"],
-                projected_capital=projected_capital,
-            )
-            log_info(
-                f"[MORNING ROTATION] {holding['symbol']} | "
-                f"action={rotation['action']} | {rotation['reason']}"
-            )
-
-            if rotation["action"] == "rotate":
-                execute_sell(broker, portfolio, holding, quote, reason="ROTATION")
-                execute_buy(broker, portfolio, rotation["best_candidate"])
-            elif rotation["action"] == "sell_no_replace":
-                execute_sell(broker, portfolio, holding, quote, reason="WEAK_TECHNICALS")
-                # No suitable replacement — sit in cash until next session
-            else:
-                log_info(f"Holding {holding['symbol']} after morning analysis.")
-        return
-
-    # No holdings — look for a new trade
-    _try_buy_best_candidate(broker, portfolio, research)
-
-
-def run_midday_session(broker, portfolio: Portfolio, risk: RiskManager, research: MarketResearch):
-    """
-    12:05 PM
-    Mirrors morning logic exactly:
-      - Hard stop-loss / profit-target checks first.
-      - Then rotation analysis: compare held stock vs all Nifty 50 alternatives.
-      - If no holdings, scan for a fresh buy (catches cases where morning found nothing).
-    """
-    log_info("=== Midday session started ===")
-
-    if portfolio.has_holdings():
-        for holding in list(portfolio.holdings):
-            quote = broker.get_quote(holding["symbol"])
-            ltp = quote["ltp"]
-
-            # --- Hard stop-loss ---
-            if risk.should_stop_loss(holding["buy_price"], ltp):
-                log_info(f"Midday hard stop-loss for {holding['symbol']}.")
-                execute_sell(broker, portfolio, holding, quote, reason="MIDDAY_STOP_LOSS")
-                _try_buy_best_candidate(broker, portfolio, research,
-                                        exclude_symbol=holding["symbol"])
-                return
+                log_info(f"[{pool_label}] Stop-loss triggered for {holding['symbol']}. Selling.")
+                execute_sell(broker, pool, holding, quote, reason="STOP_LOSS")
+                if not sell_only:
+                    _try_buy_best_candidate(broker, pool, research,
+                                            exclude_symbol=holding["symbol"])
+                continue
 
             # --- Profit target ---
             if risk.should_book_profit(holding["buy_price"], ltp):
-                pnl_pct = risk.current_pnl_pct(holding["buy_price"], ltp)
-                log_info(f"Midday profit target for {holding['symbol']} (+{pnl_pct:.2f}%). Booking.")
-                execute_sell(broker, portfolio, holding, quote, reason="MIDDAY_PROFIT")
-                _try_buy_best_candidate(broker, portfolio, research,
-                                        exclude_symbol=holding["symbol"])
-                return
+                log_info(f"[{pool_label}] Profit target hit for {holding['symbol']} (+{pnl_pct:.2f}%).")
+                execute_sell(broker, pool, holding, quote, reason="PROFIT_TARGET")
+                if not sell_only:
+                    _try_buy_best_candidate(broker, pool, research,
+                                            exclude_symbol=holding["symbol"])
+                continue
 
-            # --- Rotation analysis ---
-            projected_capital = portfolio.capital_remaining + holding["amount_invested"]
+            # --- After 3 PM: EOD loss threshold check ---
+            if sell_only:
+                if risk.eod_should_sell(holding["buy_price"], ltp):
+                    log_info(
+                        f"[{pool_label}] EOD loss threshold for {holding['symbol']} "
+                        f"({pnl_pct:.2f}%). Selling before close."
+                    )
+                    execute_sell(broker, pool, holding, quote, reason="EOD_EXIT")
+                else:
+                    log_info(
+                        f"[{pool_label}] Holding {holding['symbol']} overnight. "
+                        f"P&L: {pnl_pct:+.2f}%."
+                    )
+                continue
+
+            # --- Before 3 PM: rotation analysis ---
+            projected_capital = pool.capital_remaining + holding["amount_invested"]
             rotation = research.find_best_rotation_candidate(
                 held_symbol=holding["symbol"],
                 projected_capital=projected_capital,
             )
             log_info(
-                f"[MIDDAY ROTATION] {holding['symbol']} | "
+                f"[{pool_label} ROTATION] {holding['symbol']} | "
                 f"action={rotation['action']} | {rotation['reason']}"
             )
 
             if rotation["action"] == "rotate":
-                execute_sell(broker, portfolio, holding, quote, reason="MIDDAY_ROTATION")
-                execute_buy(broker, portfolio, rotation["best_candidate"])
+                execute_sell(broker, pool, holding, quote, reason="ROTATION")
+                execute_buy(broker, pool, rotation["best_candidate"])
             elif rotation["action"] == "sell_no_replace":
-                execute_sell(broker, portfolio, holding, quote, reason="MIDDAY_WEAK_TECHNICALS")
+                execute_sell(broker, pool, holding, quote, reason="WEAK_TECHNICALS")
             else:
-                log_info(f"Midday: holding {holding['symbol']}.")
+                log_info(f"[{pool_label}] Holding {holding['symbol']}.")
         return
 
-    # No holdings — try a midday entry if morning missed
-    log_info("No holdings at midday. Scanning for entry opportunity.")
-    _try_buy_best_candidate(broker, portfolio, research)
-
-
-def run_eod_session(broker, portfolio: Portfolio, risk: RiskManager, research: MarketResearch):
-    """
-    3:00 PM — Final check before market close.
-    ONLY sell decisions are made here. If we sell, we do NOT look for a
-    replacement — we go flat and let the next morning's session find a new trade.
-    """
-    log_info("=== EOD session started ===")
-
-    if not portfolio.has_holdings():
-        log_info("No holdings at EOD. Nothing to do.")
+    # No holdings — scan for a new trade (only if before 3 PM)
+    if sell_only:
+        log_info(f"[{pool_label}] No holdings at EOD. Nothing to do.")
         return
 
-    for holding in list(portfolio.holdings):
-        quote = broker.get_quote(holding["symbol"])
-        ltp = quote["ltp"]
-        pnl_pct = risk.current_pnl_pct(holding["buy_price"], ltp)
-
-        if risk.should_stop_loss(holding["buy_price"], ltp):
-            log_info(f"EOD stop-loss for {holding['symbol']} ({pnl_pct:.2f}%). Selling.")
-            execute_sell(broker, portfolio, holding, quote, reason="EOD_STOP_LOSS")
-
-        elif risk.should_book_profit(holding["buy_price"], ltp):
-            log_info(f"EOD profit target for {holding['symbol']} (+{pnl_pct:.2f}%). Booking.")
-            execute_sell(broker, portfolio, holding, quote, reason="EOD_PROFIT")
-
-        elif risk.eod_should_sell(holding["buy_price"], ltp):
-            log_info(
-                f"EOD loss threshold exceeded for {holding['symbol']} "
-                f"({pnl_pct:.2f}%). Selling before close."
-            )
-            execute_sell(broker, portfolio, holding, quote, reason="EOD_EXIT")
-
-        else:
-            log_info(
-                f"EOD: holding {holding['symbol']} overnight. "
-                f"P&L: {pnl_pct:+.2f}% — within acceptable range."
-            )
-        # NOTE: No buy scan after EOD sell. Tomorrow's morning session decides.
+    _try_buy_best_candidate(broker, pool, research)
 
 
 # ---------------------------------------------------------------------------
@@ -403,7 +341,7 @@ def run_eod_session(broker, portfolio: Portfolio, risk: RiskManager, research: M
 
 def main():
     logger.info(
-        f"Trading agent starting | RUN_TYPE={RUN_TYPE} | "
+        f"Trading agent starting | RUN_TYPE={RUN_TYPE} | SELL_ONLY={SELL_ONLY} | "
         f"BROKER={ACTIVE_BROKER} | DRY_RUN={DRY_RUN}"
     )
     _ensure_log_file()
@@ -422,17 +360,16 @@ def main():
 
     portfolio = Portfolio.load()
     risk = RiskManager()
-    research = MarketResearch(broker)
+
+    # One research instance per stock universe
+    nifty50_research = MarketResearch(broker, stock_universe=NIFTY50_SYMBOLS)
+    smallcap_research = MarketResearch(broker, stock_universe=NIFTY_SMALLCAP_50_SYMBOLS)
 
     try:
-        if RUN_TYPE == "morning":
-            run_morning_session(broker, portfolio, risk, research)
-        elif RUN_TYPE == "midday":
-            run_midday_session(broker, portfolio, risk, research)
-        elif RUN_TYPE == "eod":
-            run_eod_session(broker, portfolio, risk, research)
+        process_pool(broker, portfolio.nifty50, risk, nifty50_research, SELL_ONLY)
+        process_pool(broker, portfolio.smallcap50, risk, smallcap_research, SELL_ONLY)
     except Exception as e:
-        err = f"Unhandled error during {RUN_TYPE} session: {e}"
+        err = f"Unhandled error during trading run: {e}"
         logger.exception(err)
         notify_error(err)
     finally:
