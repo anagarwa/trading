@@ -72,3 +72,9 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-25T11:21:21.840065+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
 2026-03-25T11:21:36.167423+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50 ROTATION] HSCL | action=hold | Holding HSCL (score=1.631). KALYANKJIL (score=1.533) does not clear the 1.3x rotation threshold.
 2026-03-25T11:21:36.167632+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL.
+2026-03-25T13:21:13.269730+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
+2026-03-25T13:21:23.717283+05:30,run,kite,INFO,,,,,,,,[NIFTY50 ROTATION] RELIANCE | action=hold | Holding RELIANCE (score=0.822). HCLTECH (score=0.773) does not clear the 1.3x rotation threshold.
+2026-03-25T13:21:23.717496+05:30,run,kite,INFO,,,,,,,,[NIFTY50] Holding RELIANCE.
+2026-03-25T13:21:23.717668+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
+2026-03-25T13:21:37.023965+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50 ROTATION] HSCL | action=hold | Holding HSCL (score=1.698). SPARC (score=1.619) does not clear the 1.3x rotation threshold.
+2026-03-25T13:21:37.024177+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL.
