@@ -1,16 +1,32 @@
 {
   "nifty50": {
-    "capital_remaining": 5000.0,
+    "capital_remaining": 2159.8,
     "profit_booked": 0.0,
     "total_losses_taken": 0.0,
-    "holdings": []
+    "holdings": [
+      {
+        "symbol": "RELIANCE",
+        "quantity": 2,
+        "buy_price": 1420.1,
+        "buy_date": "2026-03-25",
+        "amount_invested": 2840.2
+      }
+    ]
   },
   "smallcap50": {
-    "capital_remaining": 5000.0,
+    "capital_remaining": 1316.4,
     "profit_booked": 0.0,
     "total_losses_taken": 0.0,
-    "holdings": []
+    "holdings": [
+      {
+        "symbol": "HSCL",
+        "quantity": 8,
+        "buy_price": 460.45,
+        "buy_date": "2026-03-25",
+        "amount_invested": 3683.6
+      }
+    ]
   },
-  "last_updated": "",
+  "last_updated": "2026-03-25T10:18:16.377794+05:30",
   "trading_day_complete": false
 }
