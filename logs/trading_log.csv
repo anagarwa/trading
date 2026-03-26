@@ -83,3 +83,4 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-25T15:21:14.532053+05:30,run,kite,SELL,RELIANCE,2,1410.7,260325151790127,EOD_EXIT,-18.8,4981.2,pool=nifty50
 2026-03-25T15:21:19.061211+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=True) ---
 2026-03-25T15:21:19.306889+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL overnight. P&L: +0.15%.
+2026-03-26T09:21:15.946444+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
