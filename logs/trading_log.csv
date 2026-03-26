@@ -86,3 +86,7 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-26T09:21:15.946444+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
 2026-03-26T11:21:18.224895+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
 2026-03-26T13:21:16.195752+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
+2026-03-26T15:20:55.510370+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=True) ---
+2026-03-26T15:20:55.510558+05:30,run,kite,INFO,,,,,,,,[NIFTY50] No holdings at EOD. Nothing to do.
+2026-03-26T15:20:55.510701+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=True) ---
+2026-03-26T15:20:55.798597+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL overnight. P&L: +0.13%.
