@@ -24,7 +24,7 @@ import pytz
 from config import ACTIVE_BROKER, DRY_RUN
 from broker import get_broker
 from agent.market_research import MarketResearch
-from agent.notifications import notify_buy, notify_error, notify_sell, notify_skip
+from agent.notifications import notify_buy, notify_error, notify_hold, notify_run_summary, notify_sell, notify_skip
 from agent.portfolio import Portfolio, PoolPortfolio
 from agent.risk_manager import RiskManager
 from constants import NIFTY50_SYMBOLS, NIFTY_SMALLCAP_50_SYMBOLS
@@ -177,7 +177,7 @@ def execute_buy(broker, pool: PoolPortfolio, candidate: dict):
             capital_remaining=pool.capital_remaining,
             notes=f"pool={pool.pool_name} amount_invested={amount_invested}",
         )
-        notify_buy(symbol, quantity, ltp, amount_invested, pool.capital_remaining)
+        notify_buy(pool.pool_name, symbol, quantity, ltp, amount_invested, pool.capital_remaining)
         return
 
     order = broker.place_market_buy(symbol, quantity)
@@ -192,7 +192,7 @@ def execute_buy(broker, pool: PoolPortfolio, candidate: dict):
         capital_remaining=pool.capital_remaining,
         notes=notes,
     )
-    notify_buy(symbol, quantity, ltp, amount_invested, pool.capital_remaining)
+    notify_buy(pool.pool_name, symbol, quantity, ltp, amount_invested, pool.capital_remaining)
 
 
 def execute_sell(broker, pool: PoolPortfolio, holding: dict, quote: dict, reason: str):
@@ -213,7 +213,7 @@ def execute_sell(broker, pool: PoolPortfolio, holding: dict, quote: dict, reason
             capital_remaining=pool.capital_remaining,
             notes=f"pool={pool.pool_name}",
         )
-        notify_sell(symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
+        notify_sell(pool.pool_name, symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
         return
 
     order = broker.place_market_sell(symbol, quantity)
@@ -224,7 +224,7 @@ def execute_sell(broker, pool: PoolPortfolio, holding: dict, quote: dict, reason
         capital_remaining=pool.capital_remaining,
         notes=f"pool={pool.pool_name}",
     )
-    notify_sell(symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
+    notify_sell(pool.pool_name, symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +305,7 @@ def process_pool(broker, pool: PoolPortfolio, risk: RiskManager,
                         f"[{pool_label}] Holding {holding['symbol']} overnight. "
                         f"P&L: {pnl_pct:+.2f}%."
                     )
+                    notify_hold(pool.pool_name, holding["symbol"], pnl_pct, pool.capital_remaining)
                 continue
 
             # --- Before 3 PM: rotation analysis ---
@@ -325,6 +326,7 @@ def process_pool(broker, pool: PoolPortfolio, risk: RiskManager,
                 execute_sell(broker, pool, holding, quote, reason="WEAK_TECHNICALS")
             else:
                 log_info(f"[{pool_label}] Holding {holding['symbol']}.")
+                notify_hold(pool.pool_name, holding["symbol"], pnl_pct, pool.capital_remaining)
         return
 
     # No holdings — scan for a new trade (only if before 3 PM)
@@ -374,6 +376,7 @@ def main():
         notify_error(err)
     finally:
         portfolio.save()
+        notify_run_summary(portfolio.nifty50, portfolio.smallcap50, SELL_ONLY)
         logger.info("Portfolio state saved. Agent run complete.")
 
 
