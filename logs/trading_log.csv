@@ -90,3 +90,8 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-26T15:20:55.510558+05:30,run,kite,INFO,,,,,,,,[NIFTY50] No holdings at EOD. Nothing to do.
 2026-03-26T15:20:55.510701+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=True) ---
 2026-03-26T15:20:55.798597+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL overnight. P&L: +0.13%.
+2026-03-27T09:53:55.480132+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
+2026-03-27T09:54:04.493831+05:30,run,kite,BUY,TECHM,2,1418.6,260327150374666,,0.0,2144.0,pool=nifty50 RSI=51.1 MACD_cross=False
+2026-03-27T09:54:05.403385+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
+2026-03-27T09:54:17.052219+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50 ROTATION] HSCL | action=hold | Holding HSCL (score=0.808). NHPC (score=0.884) does not clear the 1.3x rotation threshold.
+2026-03-27T09:54:17.052429+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL.

@@ -1,9 +1,17 @@
 {
   "nifty50": {
-    "capital_remaining": 4981.2,
+    "capital_remaining": 2144.0,
     "profit_booked": 0.0,
     "total_losses_taken": 18.8,
-    "holdings": []
+    "holdings": [
+      {
+        "symbol": "TECHM",
+        "quantity": 2,
+        "buy_price": 1418.6,
+        "buy_date": "2026-03-27",
+        "amount_invested": 2837.2
+      }
+    ]
   },
   "smallcap50": {
     "capital_remaining": 1316.4,
@@ -19,6 +27,6 @@
       }
     ]
   },
-  "last_updated": "2026-03-26T15:20:56.908568+05:30",
+  "last_updated": "2026-03-27T09:54:17.895506+05:30",
   "trading_day_complete": false
 }
