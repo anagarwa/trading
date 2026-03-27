@@ -1,32 +1,16 @@
 {
   "nifty50": {
-    "capital_remaining": 2144.0,
+    "capital_remaining": 4930.2,
     "profit_booked": 0.0,
-    "total_losses_taken": 18.8,
-    "holdings": [
-      {
-        "symbol": "TECHM",
-        "quantity": 2,
-        "buy_price": 1418.6,
-        "buy_date": "2026-03-27",
-        "amount_invested": 2837.2
-      }
-    ]
+    "total_losses_taken": 69.8,
+    "holdings": []
   },
   "smallcap50": {
-    "capital_remaining": 1316.4,
+    "capital_remaining": 4922.4,
     "profit_booked": 0.0,
-    "total_losses_taken": 0.0,
-    "holdings": [
-      {
-        "symbol": "HSCL",
-        "quantity": 8,
-        "buy_price": 460.45,
-        "buy_date": "2026-03-25",
-        "amount_invested": 3683.6
-      }
-    ]
+    "total_losses_taken": 77.6,
+    "holdings": []
   },
-  "last_updated": "2026-03-27T09:54:17.895506+05:30",
+  "last_updated": "2026-03-27T14:46:22.976531+05:30",
   "trading_day_complete": false
 }

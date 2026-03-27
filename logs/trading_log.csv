@@ -95,3 +95,11 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-27T09:54:05.403385+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
 2026-03-27T09:54:17.052219+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50 ROTATION] HSCL | action=hold | Holding HSCL (score=0.808). NHPC (score=0.884) does not clear the 1.3x rotation threshold.
 2026-03-27T09:54:17.052429+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Holding HSCL.
+2026-03-27T14:46:07.419147+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
+2026-03-27T14:46:07.643412+05:30,run,kite,INFO,,,,,,,,[NIFTY50] Stop-loss triggered for TECHM. Selling.
+2026-03-27T14:46:07.891274+05:30,run,kite,SELL,TECHM,2,1393.1,260327151377161,STOP_LOSS,-51.0,4930.2,pool=nifty50
+2026-03-27T14:46:16.070382+05:30,run,kite,INFO,,,,,,,,[nifty50] No qualifying buy candidate found.
+2026-03-27T14:46:16.940211+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
+2026-03-27T14:46:17.152533+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Stop-loss triggered for HSCL. Selling.
+2026-03-27T14:46:17.414253+05:30,run,kite,SELL,HSCL,8,450.75,260327151377740,STOP_LOSS,-77.6,4922.4,pool=smallcap50
+2026-03-27T14:46:22.177979+05:30,run,kite,INFO,,,,,,,,[smallcap50] No qualifying buy candidate found.
