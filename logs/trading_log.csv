@@ -112,3 +112,7 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-31T13:20:44.264496+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
 2026-03-31T13:20:54.901487+05:30,run,kite,INFO,,,,,,,,[nifty50] No qualifying buy candidate found.
 2026-03-31T13:20:55.797863+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
+2026-03-31T15:20:42.471579+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=True) ---
+2026-03-31T15:20:42.471821+05:30,run,kite,INFO,,,,,,,,[NIFTY50] No holdings at EOD. Nothing to do.
+2026-03-31T15:20:42.471973+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=True) ---
+2026-03-31T15:20:42.472127+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] No holdings at EOD. Nothing to do.
