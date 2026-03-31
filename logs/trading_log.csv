@@ -103,3 +103,6 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-03-27T14:46:17.152533+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] Stop-loss triggered for HSCL. Selling.
 2026-03-27T14:46:17.414253+05:30,run,kite,SELL,HSCL,8,450.75,260327151377740,STOP_LOSS,-77.6,4922.4,pool=smallcap50
 2026-03-27T14:46:22.177979+05:30,run,kite,INFO,,,,,,,,[smallcap50] No qualifying buy candidate found.
+2026-03-31T09:20:45.327649+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
+2026-03-31T09:20:55.806997+05:30,run,kite,INFO,,,,,,,,[nifty50] No qualifying buy candidate found.
+2026-03-31T09:20:56.831333+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=False) ---
