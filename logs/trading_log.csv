@@ -119,3 +119,7 @@ timestamp,run_type,broker,action,symbol,quantity,price,order_id,reason,pnl,capit
 2026-04-01T09:20:46.042439+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
 2026-04-01T11:20:46.026506+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
 2026-04-01T13:20:56.428586+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=False) ---
+2026-04-01T15:21:03.232425+05:30,run,kite,INFO,,,,,,,,--- Processing pool: NIFTY50 (sell_only=True) ---
+2026-04-01T15:21:03.232616+05:30,run,kite,INFO,,,,,,,,[NIFTY50] No holdings at EOD. Nothing to do.
+2026-04-01T15:21:03.232750+05:30,run,kite,INFO,,,,,,,,--- Processing pool: SMALLCAP50 (sell_only=True) ---
+2026-04-01T15:21:03.232896+05:30,run,kite,INFO,,,,,,,,[SMALLCAP50] No holdings at EOD. Nothing to do.
