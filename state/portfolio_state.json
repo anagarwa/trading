@@ -1,16 +1,16 @@
 {
   "nifty50": {
-    "capital_remaining": 4930.2,
+    "capital_remaining": 5000.0,
     "profit_booked": 0.0,
-    "total_losses_taken": 69.8,
+    "total_losses_taken": 0.0,
     "holdings": []
   },
   "smallcap50": {
-    "capital_remaining": 4922.4,
+    "capital_remaining": 5000.0,
     "profit_booked": 0.0,
-    "total_losses_taken": 77.6,
+    "total_losses_taken": 0.0,
     "holdings": []
   },
-  "last_updated": "2026-04-01T15:21:03.232972+05:30",
+  "last_updated": "",
   "trading_day_complete": false
 }

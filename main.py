@@ -47,9 +47,13 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 RUN_TYPE = sys.argv[1].strip().lower()
-if RUN_TYPE not in ("run", "morning", "midday", "eod"):
-    logger.error(f"Invalid RUN_TYPE '{RUN_TYPE}'. Expected: run (or legacy: morning|midday|eod)")
+if RUN_TYPE not in ("run", "morning", "midday", "eod", "test"):
+    logger.error(f"Invalid RUN_TYPE '{RUN_TYPE}'. Expected: run (or legacy: morning|midday|eod|test)")
     sys.exit(1)
+
+if RUN_TYPE == "test":
+    print("algo is working....")
+    sys.exit(0)
 
 IST = pytz.timezone("Asia/Kolkata")
 
