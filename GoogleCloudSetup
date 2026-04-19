@@ -1,0 +1,30 @@
+readme_content = """# Trading Bot Infrastructure Blueprint
+
+This repository contains the infrastructure configuration and deployment logic for the India-based Trading Bot. The system is architected to provide a high-security, serverless execution environment with a fixed identity for broker API whitelisting.
+
+## 🏗 System Architecture
+
+The following diagram represents the logical flow of a network request from the bot to the broker:
+
+**Cloud Run Job** → **VPC Connector** → **VPC Network** → **Cloud NAT** → **Static IP** → **Broker API**
+
+### Core Components
+
+| Component | Resource Name | Purpose |
+| :--- | :--- | :--- |
+| **VPC Network** | `trading-vpc` | Private isolated network in Mumbai (`asia-south1`) for secure internal routing. |
+| **Static IP** | `trading-static-ip` | A permanent, regional IPv4 address used for broker API whitelisting. |
+| **Cloud NAT** | `trading-nat-config` | Gateway that maps the internal VPC traffic to the Static IP. |
+| **VPC Connector** | `trading-connector` | A Serverless VPC Access bridge (`e2-micro`) allowing Cloud Run to enter the VPC. |
+| **Cloud Run Job** | `trading-job-india` | The serverless execution engine for the trading algorithm. |
+
+## 🛠 Setup & Configuration Details
+
+### 1. Networking (The "Fixed Identity" Setup)
+To ensure the bot always presents the same IP address:
+* The **VPC Connector** is assigned to the `trading-vpc`.
+* The **Cloud Run Job** is configured with `VPC Egress` set to **"Route all traffic through the VPC"**.
+* **Cloud NAT** is configured with "Manual" IP assignment, specifically using `trading-static-ip`.
+
+### 2. Deployment (The Makefile)
+We use a `Makefile` to simplify the Docker build and GCP deployment process.

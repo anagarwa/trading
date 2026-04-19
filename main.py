@@ -13,6 +13,7 @@ Two independent pools are processed in each run:
   - smallcap50: trades from Nifty Smallcap 50       (₹5,000 default)
 """
 
+import requests
 import csv
 import logging
 import os
@@ -52,6 +53,15 @@ if RUN_TYPE not in ("run", "morning", "midday", "eod", "test"):
     sys.exit(1)
 
 if RUN_TYPE == "test":
+    print("--- Networking Verification ---")
+    try:
+        # This request will travel through the VPC Connector -> Cloud NAT -> Static IP
+        current_ip = requests.get('https://ifconfig.me', timeout=10).text.strip()
+        print(f"Algo is working! Outgoing Static IP: {current_ip}")
+    except Exception as e:
+        print(f"Algo is working, but could not verify IP: {e}")
+    
+    print("-------------------------------")
     print("algo is working....")
     sys.exit(0)
 
