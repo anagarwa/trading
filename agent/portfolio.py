@@ -87,27 +87,42 @@ class PoolPortfolio:
         }
 
 
+from agent.google_sheets import GoogleSheetsClient
+
 class Portfolio:
     """
     Top-level portfolio with two pools: nifty50 and smallcap50.
-    Persisted as a single JSON file.
+    Persisted as a single JSON file or Google Sheet.
     """
 
     STATE_FILE = "state/portfolio_state.json"
 
     def __init__(self, nifty50: PoolPortfolio, smallcap50: PoolPortfolio,
-                 last_updated: str, trading_day_complete: bool):
+                 last_updated: str, trading_day_complete: bool,
+                 sheets_client: GoogleSheetsClient = None):
         self.nifty50 = nifty50
         self.smallcap50 = smallcap50
         self.last_updated = last_updated
         self.trading_day_complete = trading_day_complete
+        self.sheets_client = sheets_client
 
     @classmethod
-    def load(cls) -> "Portfolio":
-        if not os.path.exists(cls.STATE_FILE):
+    def load(cls, sheets_client: GoogleSheetsClient = None) -> "Portfolio":
+        data = None
+
+        # 1. Try loading from Google Sheets first if client is provided
+        if sheets_client:
+            data = sheets_client.load_portfolio_state()
+        
+        # 2. Fallback to local JSON if Sheets failed or client not provided
+        if not data and os.path.exists(cls.STATE_FILE):
+            with open(cls.STATE_FILE, "r") as f:
+                data = json.load(f)
+
+        if not data:
             from config import NIFTY50_BUDGET, SMALLCAP50_BUDGET
             logger.info(
-                f"No state file found. Initialising: nifty50=₹{NIFTY50_BUDGET:,.2f}, "
+                f"No state found. Initialising: nifty50=₹{NIFTY50_BUDGET:,.2f}, "
                 f"smallcap50=₹{SMALLCAP50_BUDGET:,.2f}."
             )
             return cls(
@@ -115,9 +130,8 @@ class Portfolio:
                 smallcap50=PoolPortfolio("smallcap50", SMALLCAP50_BUDGET, 0.0, 0.0, []),
                 last_updated=datetime.now(IST).isoformat(),
                 trading_day_complete=False,
+                sheets_client=sheets_client
             )
-        with open(cls.STATE_FILE, "r") as f:
-            data = json.load(f)
 
         n50 = data.get("nifty50", {})
         sc50 = data.get("smallcap50", {})
@@ -146,20 +160,29 @@ class Portfolio:
             smallcap50=smallcap50,
             last_updated=data.get("last_updated", ""),
             trading_day_complete=data.get("trading_day_complete", False),
+            sheets_client=sheets_client
         )
 
     def save(self):
-        os.makedirs(os.path.dirname(self.STATE_FILE), exist_ok=True)
         self.last_updated = datetime.now(IST).isoformat()
-        data = {
+        state_dict = {
             "nifty50": self.nifty50.to_dict(),
             "smallcap50": self.smallcap50.to_dict(),
             "last_updated": self.last_updated,
             "trading_day_complete": self.trading_day_complete,
         }
+
+        # 1. Save to Google Sheets if client is available
+        if self.sheets_client:
+            self.sheets_client.save_portfolio_state(state_dict)
+
+        # 2. Always save a local copy as backup
+        os.makedirs(os.path.dirname(self.STATE_FILE), exist_ok=True)
         with open(self.STATE_FILE, "w") as f:
-            json.dump(data, f, indent=2)
+            json.dump(state_dict, f, indent=2)
+        
         logger.info(
-            f"Portfolio saved: nifty50=₹{self.nifty50.capital_remaining:,.2f} "
+            f"Portfolio saved locally and to Sheets (if enabled): "
+            f"nifty50=₹{self.nifty50.capital_remaining:,.2f} "
             f"smallcap50=₹{self.smallcap50.capital_remaining:,.2f}"
         )

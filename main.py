@@ -22,12 +22,13 @@ from datetime import datetime
 
 import pytz
 
-from config import ACTIVE_BROKER, DRY_RUN
+from config import ACTIVE_BROKER, DRY_RUN, PORTFOLIO_SHEET_ID, LOGS_SHEET_ID
 from broker import get_broker
 from agent.market_research import MarketResearch
 from agent.notifications import notify_buy, notify_error, notify_hold, notify_run_summary, notify_sell, notify_skip
 from agent.portfolio import Portfolio, PoolPortfolio
 from agent.risk_manager import RiskManager
+from agent.google_sheets import GoogleSheetsClient
 from constants import NIFTY50_SYMBOLS, NIFTY_SMALLCAP_50_SYMBOLS
 
 # ---------------------------------------------------------------------------
@@ -39,6 +40,17 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Google Sheets Client Setup
+# ---------------------------------------------------------------------------
+sheets_client = None
+if PORTFOLIO_SHEET_ID or LOGS_SHEET_ID:
+    try:
+        sheets_client = GoogleSheetsClient(PORTFOLIO_SHEET_ID, LOGS_SHEET_ID)
+        logger.info("Google Sheets client initialized.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Google Sheets client: {e}")
 
 # ---------------------------------------------------------------------------
 # Run-type validation
@@ -98,8 +110,15 @@ def _append_log_row(**kwargs):
     row["timestamp"] = datetime.now(IST).isoformat()
     row["run_type"] = RUN_TYPE
     row["broker"] = ACTIVE_BROKER
+    
+    # 1. Local CSV log
     with open(LOG_FILE, "a", newline="") as f:
         csv.DictWriter(f, fieldnames=LOG_HEADERS).writerow(row)
+    
+    # 2. Google Sheets log
+    if sheets_client:
+        values = [row.get(h, "") for h in LOG_HEADERS]
+        sheets_client.append_log(values)
 
 
 def log_info(message: str):
@@ -121,45 +140,6 @@ def log_trade(action, symbol, quantity, price, order_id="", reason="", pnl=0.0,
 
 
 # ---------------------------------------------------------------------------
-# Kite token freshness guard
-# ---------------------------------------------------------------------------
-
-def _check_kite_token_freshness():
-    """
-    For Kite broker in live mode, verify that KITE_TOKEN_DATE equals today's
-    date in IST.  The Kite access_token expires at 6 AM every day; if this
-    date doesn't match, the token is stale and every API call will fail.
-
-    This check runs BEFORE broker.connect() so the bot aborts immediately
-    with a clear error and a Telegram alert rather than failing mid-session.
-    Skip logic:
-      DRY_RUN=true  → skip (no real orders, market-data-only calls may still work
-                       with an old token during dev/testing)
-      ACTIVE_BROKER != kite → skip (Breeze has its own session mechanism)
-    """
-    if ACTIVE_BROKER != "kite" or DRY_RUN:
-        return
-
-    token_date = os.getenv("KITE_TOKEN_DATE", "").strip()
-    today_ist  = datetime.now(IST).strftime("%Y-%m-%d")
-
-    if token_date != today_ist:
-        kite_login_url = (
-            "https://kite.zerodha.com/connect/login?v=3"
-            f"&api_key={os.getenv('KITE_API_KEY', 'UNKNOWN')}"
-        )
-        err = (
-            f"Kite access token is STALE or missing. "
-            f"KITE_TOKEN_DATE='{token_date}' but today is '{today_ist}' (IST). "
-            f"Please complete the daily login at: {kite_login_url}"
-        )
-        logger.error(err)
-        notify_error(err)
-        sys.exit(1)
-
-    logger.info(f"Kite token freshness verified for {today_ist}.")
-
-
 # ---------------------------------------------------------------------------
 # Trade execution helpers
 # ---------------------------------------------------------------------------
@@ -362,9 +342,6 @@ def main():
     )
     _ensure_log_file()
 
-    # Abort immediately if the Kite token hasn't been refreshed today
-    _check_kite_token_freshness()
-
     try:
         broker = get_broker()
         broker.connect()
@@ -374,7 +351,7 @@ def main():
         notify_error(err)
         sys.exit(1)
 
-    portfolio = Portfolio.load()
+    portfolio = Portfolio.load(sheets_client=sheets_client)
     risk = RiskManager()
 
     # One research instance per stock universe
