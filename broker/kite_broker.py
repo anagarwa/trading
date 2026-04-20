@@ -117,7 +117,21 @@ class KiteBroker(BaseBroker):
             })
         return result
 
-    def place_market_buy(self, symbol: str, quantity: int) -> dict:
+    def _round_to_tick(self, price: float) -> float:
+        """Round to nearest 0.05 tick for NSE."""
+        return round(price * 20) / 20
+
+    def place_market_buy(self, symbol: str, quantity: int, price: float | None = None) -> dict:
+        """
+        Simulate market buy using a limit order with 1% buffer to avoid
+        'Market orders without market protection are not allowed' errors.
+        """
+        if price is None:
+            price = self.get_quote(symbol)["ltp"]
+        
+        # Set limit price 1% higher to ensure execution (market protection buffer)
+        limit_price = self._round_to_tick(price * 1.01)
+
         order_id = self.kite.place_order(
             variety=self.kite.VARIETY_REGULAR,
             exchange=self.kite.EXCHANGE_NSE,
@@ -125,12 +139,25 @@ class KiteBroker(BaseBroker):
             transaction_type=self.kite.TRANSACTION_TYPE_BUY,
             quantity=quantity,
             product=self.kite.PRODUCT_CNC,
-            order_type=self.kite.ORDER_TYPE_MARKET,
+            order_type=self.kite.ORDER_TYPE_LIMIT,
+            price=limit_price
         )
-        logger.info(f"Kite BUY order placed: {order_id} — {symbol} x{quantity}")
+        logger.info(
+            f"Kite Simulated BUY (Limit @ {limit_price:.2f}) placed: "
+            f"{order_id} — {symbol} x{quantity}"
+        )
         return {"order_id": str(order_id), "symbol": symbol, "quantity": quantity, "status": "PLACED"}
 
-    def place_market_sell(self, symbol: str, quantity: int) -> dict:
+    def place_market_sell(self, symbol: str, quantity: int, price: float | None = None) -> dict:
+        """
+        Simulate market sell using a limit order with 1% buffer.
+        """
+        if price is None:
+            price = self.get_quote(symbol)["ltp"]
+
+        # Set limit price 1% lower to ensure execution
+        limit_price = self._round_to_tick(price * 0.99)
+
         order_id = self.kite.place_order(
             variety=self.kite.VARIETY_REGULAR,
             exchange=self.kite.EXCHANGE_NSE,
@@ -138,9 +165,13 @@ class KiteBroker(BaseBroker):
             transaction_type=self.kite.TRANSACTION_TYPE_SELL,
             quantity=quantity,
             product=self.kite.PRODUCT_CNC,
-            order_type=self.kite.ORDER_TYPE_MARKET,
+            order_type=self.kite.ORDER_TYPE_LIMIT,
+            price=limit_price
         )
-        logger.info(f"Kite SELL order placed: {order_id} — {symbol} x{quantity}")
+        logger.info(
+            f"Kite Simulated SELL (Limit @ {limit_price:.2f}) placed: "
+            f"{order_id} — {symbol} x{quantity}"
+        )
         return {"order_id": str(order_id), "symbol": symbol, "quantity": quantity, "status": "PLACED"}
 
     def get_positions(self) -> list[dict]:

@@ -174,7 +174,7 @@ def execute_buy(broker, pool: PoolPortfolio, candidate: dict):
         notify_buy(pool.pool_name, symbol, quantity, ltp, amount_invested, pool.capital_remaining)
         return
 
-    order = broker.place_market_buy(symbol, quantity)
+    order = broker.place_market_buy(symbol, quantity, price=ltp)
     pool.record_buy(symbol, quantity, ltp)
     notes = (
         f"pool={pool.pool_name} RSI={candidate.get('rsi', 'N/A'):.1f} "
@@ -210,7 +210,7 @@ def execute_sell(broker, pool: PoolPortfolio, holding: dict, quote: dict, reason
         notify_sell(pool.pool_name, symbol, reason, pnl, pool.capital_remaining, pool.profit_booked)
         return
 
-    order = broker.place_market_sell(symbol, quantity)
+    order = broker.place_market_sell(symbol, quantity, price=sell_price)
     pool.record_sell(symbol, sell_price, pnl)
     log_trade(
         "SELL", symbol, quantity, sell_price,

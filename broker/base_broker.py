@@ -30,11 +30,11 @@ class BaseBroker(ABC):
         return result
 
     @abstractmethod
-    def place_market_buy(self, symbol: str, quantity: int) -> dict:
+    def place_market_buy(self, symbol: str, quantity: int, price: float | None = None) -> dict:
         """Place market buy order. Return {order_id, symbol, quantity, status}"""
 
     @abstractmethod
-    def place_market_sell(self, symbol: str, quantity: int) -> dict:
+    def place_market_sell(self, symbol: str, quantity: int, price: float | None = None) -> dict:
         """Place market sell order. Return {order_id, symbol, quantity, status}"""
 
     @abstractmethod

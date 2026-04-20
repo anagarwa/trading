@@ -86,16 +86,25 @@ class BreezeBroker(BaseBroker):
                 logger.warning(f"Could not fetch Breeze quote for {symbol}: {e}")
         return result
 
-    def place_market_buy(self, symbol: str, quantity: int) -> dict:
+    def place_market_buy(self, symbol: str, quantity: int, price: float | None = None) -> dict:
+        """
+        Simulate market buy using a limit order with 1% buffer.
+        """
+        if price is None:
+            price = self.get_quote(symbol)["ltp"]
+        
+        # Set limit price 1% higher to ensure execution
+        limit_price = round(price * 1.01, 2)
+        
         stock_code = self._to_breeze_code(symbol)
         resp = self.breeze.place_order(
             stock_code=stock_code,
             exchange_code="NSE",
             product="cash",
             action="buy",
-            order_type="market",
+            order_type="limit",
             quantity=str(quantity),
-            price="0",
+            price=str(limit_price),
             validity="day",
             stoploss="0",
             disclosed_quantity="0",
@@ -106,19 +115,31 @@ class BreezeBroker(BaseBroker):
         if resp.get("Status") != 200:
             raise RuntimeError(f"Breeze BUY order failed for {symbol}: {resp}")
         order_id = str(resp.get("Success", {}).get("order_id", "UNKNOWN"))
-        logger.info(f"Breeze BUY order placed: {order_id} — {symbol} x{quantity}")
+        logger.info(
+            f"Breeze Simulated BUY (Limit @ {limit_price:.2f}) placed: "
+            f"{order_id} — {symbol} x{quantity}"
+        )
         return {"order_id": order_id, "symbol": symbol, "quantity": quantity, "status": "PLACED"}
 
-    def place_market_sell(self, symbol: str, quantity: int) -> dict:
+    def place_market_sell(self, symbol: str, quantity: int, price: float | None = None) -> dict:
+        """
+        Simulate market sell using a limit order with 1% buffer.
+        """
+        if price is None:
+            price = self.get_quote(symbol)["ltp"]
+
+        # Set limit price 1% lower to ensure execution
+        limit_price = round(price * 0.99, 2)
+
         stock_code = self._to_breeze_code(symbol)
         resp = self.breeze.place_order(
             stock_code=stock_code,
             exchange_code="NSE",
             product="cash",
             action="sell",
-            order_type="market",
+            order_type="limit",
             quantity=str(quantity),
-            price="0",
+            price=str(limit_price),
             validity="day",
             stoploss="0",
             disclosed_quantity="0",
@@ -129,7 +150,10 @@ class BreezeBroker(BaseBroker):
         if resp.get("Status") != 200:
             raise RuntimeError(f"Breeze SELL order failed for {symbol}: {resp}")
         order_id = str(resp.get("Success", {}).get("order_id", "UNKNOWN"))
-        logger.info(f"Breeze SELL order placed: {order_id} — {symbol} x{quantity}")
+        logger.info(
+            f"Breeze Simulated SELL (Limit @ {limit_price:.2f}) placed: "
+            f"{order_id} — {symbol} x{quantity}"
+        )
         return {"order_id": order_id, "symbol": symbol, "quantity": quantity, "status": "PLACED"}
 
     def get_positions(self) -> list[dict]:
