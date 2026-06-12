@@ -110,19 +110,25 @@ class Portfolio:
     def load(cls, sheets_client: GoogleSheetsClient = None) -> "Portfolio":
         data = None
 
-        # 1. Try loading from Google Sheets first if client is provided
+        # 1. PRIMARY: Try loading from Google Sheets
         if sheets_client:
             data = sheets_client.load_portfolio_state()
+            if data:
+                logger.info("Portfolio state loaded from Google Sheets (Primary).")
+            else:
+                logger.error("Failed to load portfolio state from Google Sheets. Sheets is the primary source of truth.")
         
-        # 2. Fallback to local JSON if Sheets failed or client not provided
-        if not data and os.path.exists(cls.STATE_FILE):
-            with open(cls.STATE_FILE, "r") as f:
-                data = json.load(f)
+        # 2. SECONDARY/FALLBACK: Local JSON only if Sheets client is not configured
+        if not data and not sheets_client:
+            if os.path.exists(cls.STATE_FILE):
+                with open(cls.STATE_FILE, "r") as f:
+                    data = json.load(f)
+                logger.info("Portfolio state loaded from local JSON (Fallback).")
 
         if not data:
             from config import NIFTY50_BUDGET, SMALLCAP50_BUDGET
             logger.info(
-                f"No state found. Initialising: nifty50=₹{NIFTY50_BUDGET:,.2f}, "
+                f"No state found (Sheets or Local). Initialising: nifty50=₹{NIFTY50_BUDGET:,.2f}, "
                 f"smallcap50=₹{SMALLCAP50_BUDGET:,.2f}."
             )
             return cls(

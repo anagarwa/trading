@@ -38,6 +38,14 @@ class BaseBroker(ABC):
         """Place market sell order. Return {order_id, symbol, quantity, status}"""
 
     @abstractmethod
+    def place_gtt_order(self, symbol: str, quantity: int, trigger_price: float, 
+                        transaction_type: str = "BUY") -> dict:
+        """
+        Place a Good Till Triggered (GTT) order.
+        transaction_type: "BUY" or "SELL"
+        """
+
+    @abstractmethod
     def get_positions(self) -> list[dict]:
         """Return open positions: [{symbol, quantity, avg_price, ltp, pnl}]"""
 

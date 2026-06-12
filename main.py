@@ -3,6 +3,7 @@ main.py — Trading Agent Entry Point
 
 Called by GitHub Actions (via Cloudflare Worker scheduler) as:
     python main.py run        # Every 2 hours starting 9:20 AM IST
+    python main.py prerun     # Every day at 9:00 AM IST (Pre-market)
 
 The bot auto-detects whether it's before or after 3 PM IST:
   - Before 3 PM: full analysis (stop-loss, profit-target, rotation, buy)
@@ -25,6 +26,7 @@ import pytz
 from config import ACTIVE_BROKER, DRY_RUN, PORTFOLIO_SHEET_ID, LOGS_SHEET_ID
 from broker import get_broker
 from agent.market_research import MarketResearch
+from agent.global_research import GlobalMarketResearch
 from agent.notifications import notify_buy, notify_error, notify_hold, notify_run_summary, notify_sell, notify_skip
 from agent.portfolio import Portfolio, PoolPortfolio
 from agent.risk_manager import RiskManager
@@ -56,12 +58,12 @@ if PORTFOLIO_SHEET_ID or LOGS_SHEET_ID:
 # Run-type validation
 # ---------------------------------------------------------------------------
 if len(sys.argv) < 2:
-    logger.error("Usage: python main.py <run>")
+    logger.error("Usage: python main.py <run|prerun>")
     sys.exit(1)
 
 RUN_TYPE = sys.argv[1].strip().lower()
-if RUN_TYPE not in ("run", "morning", "midday", "eod", "test"):
-    logger.error(f"Invalid RUN_TYPE '{RUN_TYPE}'. Expected: run (or legacy: morning|midday|eod|test)")
+if RUN_TYPE not in ("run", "prerun", "morning", "midday", "eod", "test"):
+    logger.error(f"Invalid RUN_TYPE '{RUN_TYPE}'. Expected: run|prerun")
     sys.exit(1)
 
 if RUN_TYPE == "test":
@@ -225,6 +227,44 @@ def execute_sell(broker, pool: PoolPortfolio, holding: dict, quote: dict, reason
 # Session runners
 # ---------------------------------------------------------------------------
 
+def handle_prerun(broker, portfolio: Portfolio):
+    """
+    9 AM IST Logic:
+    1. Check Asian market sentiment.
+    2. If bullish, place GTT buy orders for best candidates.
+    3. If bearish, place GTT stop-loss exits for weak holdings.
+    """
+    log_info("--- Starting PRERUN (9 AM IST Asian Market Analysis) ---")
+    global_research = GlobalMarketResearch()
+    bias = global_research.get_asian_market_bias()
+    log_info(f"Asian Market Bias: {bias['bias']} | Indices: {bias['indices']}")
+
+    nifty_research = MarketResearch(broker, stock_universe=NIFTY50_SYMBOLS)
+    risk = RiskManager()
+
+    for pool in [portfolio.nifty50, portfolio.smallcap50]:
+        log_info(f"Processing {pool.pool_name} for GTT opportunities...")
+        
+        # 1. Bearish Bias -> Protect Holdings
+        if bias["overall_sentiment"] <= -1.0:
+            for holding in pool.holdings:
+                log_info(f"Bearish bias: Placing GTT protective sell for {holding['symbol']}")
+                trigger = round(holding["buy_price"] * 0.98, 2) # 2% SL trigger
+                broker.place_gtt_order(holding["symbol"], holding["quantity"], trigger, "SELL")
+
+        # 2. Bullish Bias -> Aggressive Entry
+        elif bias["overall_sentiment"] >= 1.0:
+            if pool.capital_remaining > 500:
+                candidate = nifty_research.find_best_buy_candidate(pool.capital_remaining)
+                if candidate:
+                    log_info(f"Bullish bias: Placing GTT aggressive buy for {candidate['symbol']}")
+                    # Trigger slightly above current LTP to capture opening momentum
+                    trigger = round(candidate["ltp"] * 1.005, 2) 
+                    max_invest = risk.max_investment(pool.capital_remaining)
+                    qty = int(max_invest // candidate["ltp"])
+                    if qty >= 1:
+                        broker.place_gtt_order(candidate["symbol"], qty, trigger, "BUY")
+
 
 def _try_buy_best_candidate(broker, pool: PoolPortfolio, research: MarketResearch,
                              exclude_symbol: str | None = None):
@@ -352,6 +392,13 @@ def main():
         sys.exit(1)
 
     portfolio = Portfolio.load(sheets_client=sheets_client)
+    
+    if RUN_TYPE == "prerun":
+        handle_prerun(broker, portfolio)
+        portfolio.save()
+        logger.info("Prerun complete. Portfolio saved.")
+        return
+
     risk = RiskManager()
 
     # One research instance per stock universe

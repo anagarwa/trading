@@ -174,6 +174,38 @@ class KiteBroker(BaseBroker):
         )
         return {"order_id": str(order_id), "symbol": symbol, "quantity": quantity, "status": "PLACED"}
 
+    def place_gtt_order(self, symbol: str, quantity: int, trigger_price: float, 
+                        transaction_type: str = "BUY") -> dict:
+        """
+        Place a GTT (Good Till Triggered) order on Kite.
+        Uses a SINGLE trigger type for OCO-like or simple entry.
+        """
+        tt = self.kite.TRANSACTION_TYPE_BUY if transaction_type == "BUY" else self.kite.TRANSACTION_TYPE_SELL
+        
+        # Limit price set slightly above/below trigger for guaranteed execution
+        limit_price = self._round_to_tick(trigger_price * (1.005 if transaction_type == "BUY" else 0.995))
+
+        trigger_values = {
+            "type": self.kite.GTT_TYPE_SINGLE,
+            "condition": {
+                "exchange": "NSE",
+                "tradingsymbol": symbol,
+                "trigger_values": [self._round_to_tick(trigger_price)],
+                "last_price": self.get_quote(symbol)["ltp"]
+            },
+            "orders": [{
+                "transaction_type": tt,
+                "quantity": quantity,
+                "product": self.kite.PRODUCT_CNC,
+                "order_type": self.kite.ORDER_TYPE_LIMIT,
+                "price": limit_price
+            }]
+        }
+
+        gtt_resp = self.kite.place_gtt(**trigger_values)
+        logger.info(f"GTT {transaction_type} placed for {symbol} at trigger {trigger_price}")
+        return {"trigger_id": gtt_resp.get("trigger_id"), "symbol": symbol, "status": "GTT_PLACED"}
+
     def get_positions(self) -> list[dict]:
         positions_data = self.kite.positions()
         result = []
